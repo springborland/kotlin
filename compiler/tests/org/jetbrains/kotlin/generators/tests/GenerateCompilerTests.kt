@@ -525,6 +525,10 @@ fun main(args: Array<String>) {
             testClass<AbstractIrAsmLikeInstructionListingTest> {
                 model("codegen/asmLike", targetBackend = TargetBackend.JVM_IR)
             }
+
+            testClass<AbstractIrScriptCodegenTest> {
+                model("codegen/script", extension = "kts", targetBackend = TargetBackend.JVM_IR)
+            }
         }
 
         testGroup(
@@ -534,6 +538,10 @@ fun main(args: Array<String>) {
         ) {
             testClass<AbstractFirBlackBoxCodegenTest> {
                 model("codegen/box", targetBackend = TargetBackend.JVM_IR, excludeDirs = listOf("oldLanguageVersions"))
+            }
+
+            testClass<AbstractFirScriptCodegenTest> {
+                model("codegen/script", extension = "kts", targetBackend = TargetBackend.JVM_IR, excludeDirs = listOf("oldLanguageVersions"))
             }
 
             testClass<AbstractFirBlackBoxInlineCodegenTest> {
