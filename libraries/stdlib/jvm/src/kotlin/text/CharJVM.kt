@@ -45,10 +45,13 @@ public inline fun Char.isIdentifierIgnorable(): Boolean = Character.isIdentifier
 
 /**
  * Returns `true` if this character is an ISO control character.
+ *
+ * A character is considered to be an ISO control character if its code is in the range `'\u0000'..'\u001F'` or in the range `'\u007F'..'\u009F'`.
+ *
  * @sample samples.text.Chars.isISOControl
  */
 @kotlin.internal.InlineOnly
-public inline fun Char.isISOControl(): Boolean = Character.isISOControl(this)
+public actual inline fun Char.isISOControl(): Boolean = Character.isISOControl(this)
 
 /**
  * Returns `true` if this  character (Unicode code point) may be part of a Java identifier as other than the first character.
