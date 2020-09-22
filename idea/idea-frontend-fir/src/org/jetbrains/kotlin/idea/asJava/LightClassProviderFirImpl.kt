@@ -7,6 +7,7 @@ package org.jetbrains.kotlin.idea.asJava
 
 import com.intellij.psi.*
 import org.jetbrains.kotlin.asJava.classes.KtLightClass
+import org.jetbrains.kotlin.asJava.toLightClass
 import org.jetbrains.kotlin.psi.*
 
 class LightClassProviderFirImpl : LightClassProvider {
@@ -35,7 +36,7 @@ class LightClassProviderFirImpl : LightClassProvider {
     }
 
     override fun toLightClass(classOrObject: KtClassOrObject): KtLightClass? {
-        return null
+        return classOrObject.toLightClass()
     }
 
     override fun toLightElements(ktElement: KtElement): List<PsiNamedElement> {
