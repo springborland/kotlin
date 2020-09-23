@@ -82,7 +82,7 @@ class KotlinChangeSignatureDialog(
 
     override fun createReturnTypeCodeFragment() = createReturnTypeCodeFragment(myProject, myMethod)
 
-    private val parametersTableModel: KotlinCallableParameterTableModel get() = super.myParametersTableModel
+    private val parametersTableModel: KotlinCallableParameterTableModel get() = myParametersTableModel
 
     override fun getRowPresentation(
         item: ParameterTableModelItemBase<KotlinParameterInfo>,
