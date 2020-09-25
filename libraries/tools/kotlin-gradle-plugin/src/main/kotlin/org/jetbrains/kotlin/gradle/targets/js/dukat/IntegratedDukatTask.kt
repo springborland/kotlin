@@ -6,6 +6,7 @@
 package org.jetbrains.kotlin.gradle.targets.js.dukat
 
 import org.gradle.api.tasks.OutputDirectory
+import org.gradle.api.tasks.TaskAction
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinJsCompilation
 import org.jetbrains.kotlin.gradle.targets.js.npm.npmProject
 import java.io.File
@@ -24,9 +25,17 @@ constructor(
         get() = compilation.npmProject.externalsDir
 
     private val executor by lazy {
-        DukatExecutor(nodeJs, dts, compilation.npmProject, true, compareInputs = false)
+        DukatExecutor(
+            nodeJs,
+            dts,
+            externalsOutputFormat,
+            compilation.npmProject,
+            true,
+            compareInputs = false
+        )
     }
 
+    @TaskAction
     override fun run() {
         executor.execute()
     }
