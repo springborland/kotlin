@@ -43,7 +43,7 @@ class FirStatusResolveTransformer(
 abstract class AbstractFirStatusResolveTransformer(
     final override val session: FirSession,
     val scopeSession: ScopeSession
-) : FirAbstractTreeTransformer<FirDeclarationStatus?>(phase = FirResolvePhase.STATUS) {
+) : FirAbstractTreeTransformer<FirResolvedDeclarationStatus?>(phase = FirResolvePhase.STATUS) {
     private val classes = mutableListOf<FirClass<*>>()
 
     private val containingClass: FirClass<*>? get() = classes.lastOrNull()
@@ -52,7 +52,7 @@ abstract class AbstractFirStatusResolveTransformer(
 
     override fun transformDeclarationStatus(
         declarationStatus: FirDeclarationStatus,
-        data: FirDeclarationStatus?
+        data: FirResolvedDeclarationStatus?
     ): CompositeTransformResult<FirDeclarationStatus> {
         return (data ?: declarationStatus).compose()
     }
@@ -67,7 +67,10 @@ abstract class AbstractFirStatusResolveTransformer(
         return result
     }
 
-    override fun transformDeclaration(declaration: FirDeclaration, data: FirDeclarationStatus?): CompositeTransformResult<FirDeclaration> {
+    override fun transformDeclaration(
+        declaration: FirDeclaration,
+        data: FirResolvedDeclarationStatus?
+    ): CompositeTransformResult<FirDeclaration> {
         declaration.replaceResolvePhase(transformerPhase)
         return when (declaration) {
             is FirCallableDeclaration<*> -> {
@@ -93,14 +96,20 @@ abstract class AbstractFirStatusResolveTransformer(
         }
     }
 
-    override fun transformTypeAlias(typeAlias: FirTypeAlias, data: FirDeclarationStatus?): CompositeTransformResult<FirDeclaration> {
+    override fun transformTypeAlias(
+        typeAlias: FirTypeAlias,
+        data: FirResolvedDeclarationStatus?
+    ): CompositeTransformResult<FirDeclaration> {
         if (!typeAlias.needResolve()) return typeAlias.compose()
         typeAlias.typeParameters.forEach { transformDeclaration(it, data) }
         typeAlias.transformStatus(this, typeAlias.resolveStatus(typeAlias.status, containingClass, isLocal = false))
         return transformDeclaration(typeAlias, data)
     }
 
-    override fun transformRegularClass(regularClass: FirRegularClass, data: FirDeclarationStatus?): CompositeTransformResult<FirStatement> {
+    override fun transformRegularClass(
+        regularClass: FirRegularClass,
+        data: FirResolvedDeclarationStatus?
+    ): CompositeTransformResult<FirStatement> {
         if (!regularClass.needResolve()) return regularClass.compose()
         regularClass.transformStatus(this, regularClass.resolveStatus(regularClass.status, containingClass, isLocal = false))
         @Suppress("UNCHECKED_CAST")
@@ -112,7 +121,7 @@ abstract class AbstractFirStatusResolveTransformer(
 
     override fun transformAnonymousObject(
         anonymousObject: FirAnonymousObject,
-        data: FirDeclarationStatus?
+        data: FirResolvedDeclarationStatus?
     ): CompositeTransformResult<FirStatement> {
         if (!anonymousObject.needResolve()) return anonymousObject.compose()
         @Suppress("UNCHECKED_CAST")
@@ -123,7 +132,7 @@ abstract class AbstractFirStatusResolveTransformer(
 
     override fun transformPropertyAccessor(
         propertyAccessor: FirPropertyAccessor,
-        data: FirDeclarationStatus?
+        data: FirResolvedDeclarationStatus?
     ): CompositeTransformResult<FirDeclaration> {
         if (!propertyAccessor.needResolve()) return propertyAccessor.compose()
         propertyAccessor.transformStatus(this, propertyAccessor.resolveStatus(propertyAccessor.status, containingClass, isLocal = false))
@@ -133,7 +142,7 @@ abstract class AbstractFirStatusResolveTransformer(
 
     override fun transformConstructor(
         constructor: FirConstructor,
-        data: FirDeclarationStatus?
+        data: FirResolvedDeclarationStatus?
     ): CompositeTransformResult<FirDeclaration> {
         if (!constructor.needResolve()) return constructor.compose()
         constructor.transformStatus(this, constructor.resolveStatus(constructor.status, containingClass, isLocal = false))
@@ -142,7 +151,7 @@ abstract class AbstractFirStatusResolveTransformer(
 
     override fun transformSimpleFunction(
         simpleFunction: FirSimpleFunction,
-        data: FirDeclarationStatus?
+        data: FirResolvedDeclarationStatus?
     ): CompositeTransformResult<FirDeclaration> {
         if (!simpleFunction.needResolve()) return simpleFunction.compose()
         simpleFunction.transformStatus(this, simpleFunction.resolveStatus(simpleFunction.status, containingClass, isLocal = false))
@@ -151,7 +160,7 @@ abstract class AbstractFirStatusResolveTransformer(
 
     override fun transformProperty(
         property: FirProperty,
-        data: FirDeclarationStatus?
+        data: FirResolvedDeclarationStatus?
     ): CompositeTransformResult<FirDeclaration> {
         if (!property.needResolve()) return property.compose()
         property.transformStatus(this, property.resolveStatus(property.status, containingClass, isLocal = false))
@@ -160,14 +169,17 @@ abstract class AbstractFirStatusResolveTransformer(
 
     override fun transformField(
         field: FirField,
-        data: FirDeclarationStatus?
+        data: FirResolvedDeclarationStatus?
     ): CompositeTransformResult<FirDeclaration> {
         if (!field.needResolve()) return field.compose()
         field.transformStatus(this, field.resolveStatus(field.status, containingClass, isLocal = false))
         return transformDeclaration(field, data)
     }
 
-    override fun transformEnumEntry(enumEntry: FirEnumEntry, data: FirDeclarationStatus?): CompositeTransformResult<FirDeclaration> {
+    override fun transformEnumEntry(
+        enumEntry: FirEnumEntry,
+        data: FirResolvedDeclarationStatus?
+    ): CompositeTransformResult<FirDeclaration> {
         if (!enumEntry.needResolve()) return enumEntry.compose()
         enumEntry.transformStatus(this, enumEntry.resolveStatus(enumEntry.status, containingClass, isLocal = false))
         return transformDeclaration(enumEntry, data)
@@ -175,7 +187,7 @@ abstract class AbstractFirStatusResolveTransformer(
 
     override fun transformValueParameter(
         valueParameter: FirValueParameter,
-        data: FirDeclarationStatus?
+        data: FirResolvedDeclarationStatus?
     ): CompositeTransformResult<FirStatement> {
         if (!valueParameter.needResolve()) return valueParameter.compose()
         @Suppress("UNCHECKED_CAST")
@@ -184,13 +196,13 @@ abstract class AbstractFirStatusResolveTransformer(
 
     override fun transformTypeParameter(
         typeParameter: FirTypeParameter,
-        data: FirDeclarationStatus?
+        data: FirResolvedDeclarationStatus?
     ): CompositeTransformResult<FirDeclaration> {
         if (!typeParameter.needResolve()) return typeParameter.compose()
         return transformDeclaration(typeParameter, data)
     }
 
-    override fun transformBlock(block: FirBlock, data: FirDeclarationStatus?): CompositeTransformResult<FirStatement> {
+    override fun transformBlock(block: FirBlock, data: FirResolvedDeclarationStatus?): CompositeTransformResult<FirStatement> {
         return block.compose()
     }
 }
@@ -206,7 +218,9 @@ fun FirDeclaration.resolveStatus(
     status: FirDeclarationStatus,
     containingClass: FirClass<*>?,
     isLocal: Boolean
-): FirDeclarationStatus {
+): FirResolvedDeclarationStatus {
+    if (status is FirResolvedDeclarationStatus) return status
+    require(status is FirDeclarationStatusImpl)
     if (status.visibility == Visibilities.Unknown || status.modality == null || status.modality == Modality.OPEN) {
         val visibility = when (status.visibility) {
             Visibilities.Unknown -> when {
@@ -223,9 +237,9 @@ fun FirDeclaration.resolveStatus(
                 it
             }
         } ?: resolveModality(containingClass)
-        return (status as FirDeclarationStatusImpl).resolved(visibility, modality)
+        return status.resolved(visibility, modality)
     }
-    return status
+    return status.resolved(status.visibility, status.modality!!)
 }
 
 private fun FirDeclaration.hasOwnBodyOrAccessorBody(): Boolean {
