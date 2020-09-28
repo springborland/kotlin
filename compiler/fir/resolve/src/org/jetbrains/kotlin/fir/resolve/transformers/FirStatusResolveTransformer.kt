@@ -22,21 +22,33 @@ import org.jetbrains.kotlin.fir.visitors.transformSingle
 @OptIn(AdapterForResolveProcessor::class)
 class FirStatusResolveProcessor(session: FirSession, scopeSession: ScopeSession) :
     FirTransformerBasedResolveProcessor(session, scopeSession) {
-    override val transformer = FirStatusResolveTransformer(session)
+    override val transformer = FirStatusResolveTransformer(session, scopeSession)
 }
 
-fun <F : FirClass<F>> F.runStatusResolveForLocalClass(session: FirSession): F {
-    val transformer = FirStatusResolveTransformer(session)
+fun <F : FirClass<F>> F.runStatusResolveForLocalClass(session: FirSession, scopeSession: ScopeSession): F {
+    val transformer = FirStatusResolveTransformer(session, scopeSession)
 
     return this.transform<F, Nothing?>(transformer, null).single
 }
 
 class FirStatusResolveTransformer(
-    override val session: FirSession
+    session: FirSession,
+    scopeSession: ScopeSession
+) : AbstractFirStatusResolveTransformer(session, scopeSession) {
+    override fun FirDeclaration.needResolve(): Boolean {
+        return true
+    }
+}
+
+abstract class AbstractFirStatusResolveTransformer(
+    final override val session: FirSession,
+    val scopeSession: ScopeSession
 ) : FirAbstractTreeTransformer<FirDeclarationStatus?>(phase = FirResolvePhase.STATUS) {
     private val classes = mutableListOf<FirClass<*>>()
 
     private val containingClass: FirClass<*>? get() = classes.lastOrNull()
+
+    protected abstract fun FirDeclaration.needResolve(): Boolean
 
     override fun transformDeclarationStatus(
         declarationStatus: FirDeclarationStatus,
@@ -82,12 +94,14 @@ class FirStatusResolveTransformer(
     }
 
     override fun transformTypeAlias(typeAlias: FirTypeAlias, data: FirDeclarationStatus?): CompositeTransformResult<FirDeclaration> {
+        if (!typeAlias.needResolve()) return typeAlias.compose()
         typeAlias.typeParameters.forEach { transformDeclaration(it, data) }
         typeAlias.transformStatus(this, typeAlias.resolveStatus(typeAlias.status, containingClass, isLocal = false))
         return transformDeclaration(typeAlias, data)
     }
 
     override fun transformRegularClass(regularClass: FirRegularClass, data: FirDeclarationStatus?): CompositeTransformResult<FirStatement> {
+        if (!regularClass.needResolve()) return regularClass.compose()
         regularClass.transformStatus(this, regularClass.resolveStatus(regularClass.status, containingClass, isLocal = false))
         @Suppress("UNCHECKED_CAST")
         return storeClass(regularClass) {
@@ -100,6 +114,7 @@ class FirStatusResolveTransformer(
         anonymousObject: FirAnonymousObject,
         data: FirDeclarationStatus?
     ): CompositeTransformResult<FirStatement> {
+        if (!anonymousObject.needResolve()) return anonymousObject.compose()
         @Suppress("UNCHECKED_CAST")
         return storeClass(anonymousObject) {
             transformDeclaration(anonymousObject, data)
@@ -110,6 +125,7 @@ class FirStatusResolveTransformer(
         propertyAccessor: FirPropertyAccessor,
         data: FirDeclarationStatus?
     ): CompositeTransformResult<FirDeclaration> {
+        if (!propertyAccessor.needResolve()) return propertyAccessor.compose()
         propertyAccessor.transformStatus(this, propertyAccessor.resolveStatus(propertyAccessor.status, containingClass, isLocal = false))
         @Suppress("UNCHECKED_CAST")
         return transformDeclaration(propertyAccessor, data)
@@ -119,6 +135,7 @@ class FirStatusResolveTransformer(
         constructor: FirConstructor,
         data: FirDeclarationStatus?
     ): CompositeTransformResult<FirDeclaration> {
+        if (!constructor.needResolve()) return constructor.compose()
         constructor.transformStatus(this, constructor.resolveStatus(constructor.status, containingClass, isLocal = false))
         return transformDeclaration(constructor, data)
     }
@@ -127,6 +144,7 @@ class FirStatusResolveTransformer(
         simpleFunction: FirSimpleFunction,
         data: FirDeclarationStatus?
     ): CompositeTransformResult<FirDeclaration> {
+        if (!simpleFunction.needResolve()) return simpleFunction.compose()
         simpleFunction.transformStatus(this, simpleFunction.resolveStatus(simpleFunction.status, containingClass, isLocal = false))
         return transformDeclaration(simpleFunction, data)
     }
@@ -135,6 +153,7 @@ class FirStatusResolveTransformer(
         property: FirProperty,
         data: FirDeclarationStatus?
     ): CompositeTransformResult<FirDeclaration> {
+        if (!property.needResolve()) return property.compose()
         property.transformStatus(this, property.resolveStatus(property.status, containingClass, isLocal = false))
         return transformDeclaration(property, data)
     }
@@ -143,11 +162,13 @@ class FirStatusResolveTransformer(
         field: FirField,
         data: FirDeclarationStatus?
     ): CompositeTransformResult<FirDeclaration> {
+        if (!field.needResolve()) return field.compose()
         field.transformStatus(this, field.resolveStatus(field.status, containingClass, isLocal = false))
         return transformDeclaration(field, data)
     }
 
     override fun transformEnumEntry(enumEntry: FirEnumEntry, data: FirDeclarationStatus?): CompositeTransformResult<FirDeclaration> {
+        if (!enumEntry.needResolve()) return enumEntry.compose()
         enumEntry.transformStatus(this, enumEntry.resolveStatus(enumEntry.status, containingClass, isLocal = false))
         return transformDeclaration(enumEntry, data)
     }
@@ -156,6 +177,7 @@ class FirStatusResolveTransformer(
         valueParameter: FirValueParameter,
         data: FirDeclarationStatus?
     ): CompositeTransformResult<FirStatement> {
+        if (!valueParameter.needResolve()) return valueParameter.compose()
         @Suppress("UNCHECKED_CAST")
         return transformDeclaration(valueParameter, data) as CompositeTransformResult<FirStatement>
     }
@@ -164,6 +186,7 @@ class FirStatusResolveTransformer(
         typeParameter: FirTypeParameter,
         data: FirDeclarationStatus?
     ): CompositeTransformResult<FirDeclaration> {
+        if (!typeParameter.needResolve()) return typeParameter.compose()
         return transformDeclaration(typeParameter, data)
     }
 
