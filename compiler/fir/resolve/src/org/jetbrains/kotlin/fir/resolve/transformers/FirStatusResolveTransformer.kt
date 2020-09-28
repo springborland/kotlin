@@ -12,37 +12,104 @@ import org.jetbrains.kotlin.descriptors.Visibilities
 import org.jetbrains.kotlin.descriptors.Visibility
 import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.declarations.impl.FirDeclarationStatusImpl
+import org.jetbrains.kotlin.fir.diagnostics.ConeSimpleDiagnostic
+import org.jetbrains.kotlin.fir.diagnostics.DiagnosticKind
 import org.jetbrains.kotlin.fir.expressions.FirBlock
 import org.jetbrains.kotlin.fir.expressions.FirStatement
 import org.jetbrains.kotlin.fir.resolve.ScopeSession
+import org.jetbrains.kotlin.fir.resolve.firProvider
+import org.jetbrains.kotlin.fir.types.builder.buildErrorTypeRef
 import org.jetbrains.kotlin.fir.visitors.CompositeTransformResult
 import org.jetbrains.kotlin.fir.visitors.compose
 import org.jetbrains.kotlin.fir.visitors.transformSingle
 
 @OptIn(AdapterForResolveProcessor::class)
-class FirStatusResolveProcessor(session: FirSession, scopeSession: ScopeSession) :
-    FirTransformerBasedResolveProcessor(session, scopeSession) {
-    override val transformer = FirStatusResolveTransformer(session, scopeSession)
+class FirStatusResolveProcessor(
+    session: FirSession,
+    scopeSession: ScopeSession
+) : FirTransformerBasedResolveProcessor(session, scopeSession) {
+    override val transformer = FirStatusResolveTransformer(session, scopeSession, ResolvedStatusCalculator(session, scopeSession))
 }
 
-fun <F : FirClass<F>> F.runStatusResolveForLocalClass(session: FirSession, scopeSession: ScopeSession): F {
-    val transformer = FirStatusResolveTransformer(session, scopeSession)
+fun <F : FirClass<F>> F.runStatusResolveForLocalClass(
+    session: FirSession,
+    scopeSession: ScopeSession,
+    designationMapForLocalClasses: Map<FirCallableMemberDeclaration<*>, List<FirClass<*>>>
+): F {
+    val transformer = FirStatusResolveTransformer(
+        session,
+        scopeSession,
+        ResolvedStatusCalculator(session, scopeSession, designationMapForLocalClasses)
+    )
 
     return this.transform<F, Nothing?>(transformer, null).single
 }
 
+class ResolvedStatusCalculator(
+    private val session: FirSession,
+    private val scopeSession: ScopeSession,
+    val designationMapForLocalClasses: Map<FirCallableMemberDeclaration<*>, List<FirClass<*>>> = mapOf()
+) {
+    private val firProvider = session.firProvider
+
+    fun tryCalculateResolvedStatus(declaration: FirCallableMemberDeclaration<*>): FirResolvedDeclarationStatus {
+        val status = declaration.status
+        if (status is FirResolvedDeclarationStatus) return status
+        val symbol = declaration.symbol
+        val designation = designationMapForLocalClasses[declaration] ?: buildList<FirDeclaration> {
+            val file = firProvider.getFirCallableContainerFile(symbol) ?: TODO()
+
+            val outerClasses = generateSequence(symbol.callableId.classId) { classId ->
+                classId.outerClassId
+            }.mapTo(mutableListOf()) { firProvider.getFirClassifierByFqName(it) }
+            this += file
+            this += outerClasses.filterNotNull().asReversed()
+            this += declaration
+        }
+
+        val designationIterator = designation.iterator()
+        val transformer = FirDesignatedStatusResolveTransformer(session, scopeSession, this, designationIterator)
+        designationIterator.next().transformSingle(transformer, null)
+        val newStatus = declaration.status
+        require(newStatus is FirResolvedDeclarationStatus)
+        return newStatus
+    }
+}
+
 class FirStatusResolveTransformer(
     session: FirSession,
-    scopeSession: ScopeSession
-) : AbstractFirStatusResolveTransformer(session, scopeSession) {
+    scopeSession: ScopeSession,
+    resolvedStatusCalculator: ResolvedStatusCalculator
+) : AbstractFirStatusResolveTransformer(session, scopeSession, resolvedStatusCalculator) {
     override fun FirDeclaration.needResolve(): Boolean {
         return true
     }
 }
 
+private class FirDesignatedStatusResolveTransformer(
+    session: FirSession,
+    scopeSession: ScopeSession,
+    resolvedStatusCalculator: ResolvedStatusCalculator,
+    private val designation: Iterator<FirDeclaration>
+) : AbstractFirStatusResolveTransformer(session, scopeSession, resolvedStatusCalculator) {
+    private var currentElement: FirDeclaration? = null
+
+    override fun FirDeclaration.needResolve(): Boolean {
+        if (currentElement == null && designation.hasNext()) {
+            currentElement = designation.next()
+        }
+        val result = currentElement == this
+        if (result) {
+            currentElement = null
+        }
+        return result
+    }
+}
+
 abstract class AbstractFirStatusResolveTransformer(
     final override val session: FirSession,
-    val scopeSession: ScopeSession
+    val scopeSession: ScopeSession,
+    protected val resolvedStatusCalculator: ResolvedStatusCalculator
 ) : FirAbstractTreeTransformer<FirResolvedDeclarationStatus?>(phase = FirResolvePhase.STATUS) {
     private val classes = mutableListOf<FirClass<*>>()
 
