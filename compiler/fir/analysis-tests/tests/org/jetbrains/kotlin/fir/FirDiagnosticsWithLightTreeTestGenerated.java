@@ -2665,5 +2665,10 @@ public class FirDiagnosticsWithLightTreeTestGenerated extends AbstractFirDiagnos
         public void testSingletonConstructors() throws Exception {
             runTest("compiler/fir/analysis-tests/testData/resolve/visibility/singletonConstructors.kt");
         }
+
+        @TestMetadata("visibilityWithOverrides.kt")
+        public void testVisibilityWithOverrides() throws Exception {
+            runTest("compiler/fir/analysis-tests/testData/resolve/visibility/visibilityWithOverrides.kt");
+        }
     }
 }
