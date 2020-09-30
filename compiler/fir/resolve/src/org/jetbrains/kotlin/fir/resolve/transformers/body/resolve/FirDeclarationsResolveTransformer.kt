@@ -41,7 +41,7 @@ import org.jetbrains.kotlin.utils.addToStdlib.safeAs
 
 open class FirDeclarationsResolveTransformer(transformer: FirBodyResolveTransformer) : FirPartialBodyResolveTransformer(transformer) {
     private var containingClass: FirRegularClass? = null
-    private val statusResolver: FirStatusResolver = FirStatusResolver(session, scopeSession, ResolvedStatusCalculator.Default)
+    private val statusResolver: FirStatusResolver = FirStatusResolver(session, scopeSession)
 
     private inline fun <T> withFirArrayOfCallTransformer(block: () -> T): T {
         transformer.expressionsTransformer.enableArrayOfCallTransformation = true

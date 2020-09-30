@@ -38,7 +38,7 @@ fun <F : FirClass<F>> F.runAllPhasesForLocalClass(
         components.scopeSession,
         components.createCurrentScopeList()
     )
-    runStatusResolveForLocalClass(components.session, components.scopeSession, localClassesNavigationInfo.designationMap)
+    runStatusResolveForLocalClass(components.session, components.scopeSession, localClassesNavigationInfo)
     runContractAndBodiesResolutionForLocalClass(components, resolutionMode, localClassesNavigationInfo)
     return this
 }

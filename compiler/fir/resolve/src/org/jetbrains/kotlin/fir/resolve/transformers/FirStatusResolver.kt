@@ -20,8 +20,7 @@ import org.jetbrains.kotlin.fir.scopes.unsubstitutedScope
 
 class FirStatusResolver(
     val session: FirSession,
-    val scopeSession: ScopeSession,
-    val resolvedStatusCalculator: ResolvedStatusCalculator
+    val scopeSession: ScopeSession
 ) {
     fun resolveStatus(declaration: FirDeclaration, containingClass: FirClass<*>?, isLocal: Boolean): FirResolvedDeclarationStatus {
         return when (declaration) {
@@ -48,7 +47,7 @@ class FirStatusResolver(
                     ProcessorAction.NEXT
                 }
             }.map {
-                resolvedStatusCalculator.tryCalculateResolvedStatus(it)
+                it.status as FirResolvedDeclarationStatus
             }
         }
     }
@@ -68,7 +67,7 @@ class FirStatusResolver(
                         ProcessorAction.NEXT
                     }
             }.map {
-                resolvedStatusCalculator.tryCalculateResolvedStatus(it)
+                it.status as FirResolvedDeclarationStatus
             }
         }
     }
