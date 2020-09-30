@@ -69,6 +69,8 @@ private class ResolvedStatusCalculatorWithJumps(
 
     @OptIn(ExperimentalStdlibApi::class)
     override fun tryCalculateResolvedStatus(declaration: FirCallableMemberDeclaration<*>): FirResolvedDeclarationStatus {
+        val declaration = declaration.symbol.overriddenSymbol?.fir ?: declaration
+
         val status = declaration.status
         if (status is FirResolvedDeclarationStatus) return status
         val symbol = declaration.symbol
@@ -83,9 +85,8 @@ private class ResolvedStatusCalculatorWithJumps(
             this += declaration
         }
 
-        val designationIterator = designation.iterator()
-        val transformer = FirDesignatedStatusResolveTransformer(session, scopeSession, this, designationIterator)
-        designationIterator.next().transformSingle(transformer, null)
+        val transformer = FirDesignatedStatusResolveTransformer(session, scopeSession, this, designation.iterator())
+        designation.first().transformSingle(transformer, null)
         val newStatus = declaration.status
         require(newStatus is FirResolvedDeclarationStatus)
         return newStatus
@@ -133,6 +134,11 @@ abstract class AbstractFirStatusResolveTransformer(
     private val containingClass: FirClass<*>? get() = classes.lastOrNull()
 
     protected abstract fun FirDeclaration.needResolve(): Boolean
+
+    override fun transformFile(file: FirFile, data: FirResolvedDeclarationStatus?): CompositeTransformResult<FirFile> {
+        if (!file.needResolve()) return file.compose()
+        return super.transformFile(file, data)
+    }
 
     override fun transformDeclarationStatus(
         declarationStatus: FirDeclarationStatus,
@@ -184,7 +190,6 @@ abstract class AbstractFirStatusResolveTransformer(
         typeAlias: FirTypeAlias,
         data: FirResolvedDeclarationStatus?
     ): CompositeTransformResult<FirDeclaration> {
-        if (!typeAlias.needResolve()) return typeAlias.compose()
         typeAlias.typeParameters.forEach { transformDeclaration(it, data) }
         typeAlias.transformStatus(this, statusResolver.resolveStatus(typeAlias, containingClass, isLocal = false))
         return transformDeclaration(typeAlias, data)
@@ -207,7 +212,6 @@ abstract class AbstractFirStatusResolveTransformer(
         anonymousObject: FirAnonymousObject,
         data: FirResolvedDeclarationStatus?
     ): CompositeTransformResult<FirStatement> {
-        if (!anonymousObject.needResolve()) return anonymousObject.compose()
         @Suppress("UNCHECKED_CAST")
         return storeClass(anonymousObject) {
             transformDeclaration(anonymousObject, data)
@@ -218,7 +222,6 @@ abstract class AbstractFirStatusResolveTransformer(
         propertyAccessor: FirPropertyAccessor,
         data: FirResolvedDeclarationStatus?
     ): CompositeTransformResult<FirDeclaration> {
-        if (!propertyAccessor.needResolve()) return propertyAccessor.compose()
         propertyAccessor.transformStatus(this, statusResolver.resolveStatus(propertyAccessor, containingClass, isLocal = false))
         @Suppress("UNCHECKED_CAST")
         return transformDeclaration(propertyAccessor, data)
@@ -228,7 +231,6 @@ abstract class AbstractFirStatusResolveTransformer(
         constructor: FirConstructor,
         data: FirResolvedDeclarationStatus?
     ): CompositeTransformResult<FirDeclaration> {
-        if (!constructor.needResolve()) return constructor.compose()
         constructor.transformStatus(this, statusResolver.resolveStatus(constructor, containingClass, isLocal = false))
         return transformDeclaration(constructor, data)
     }
@@ -237,7 +239,6 @@ abstract class AbstractFirStatusResolveTransformer(
         simpleFunction: FirSimpleFunction,
         data: FirResolvedDeclarationStatus?
     ): CompositeTransformResult<FirDeclaration> {
-        if (!simpleFunction.needResolve()) return simpleFunction.compose()
         simpleFunction.transformStatus(this, statusResolver.resolveStatus(simpleFunction, containingClass, isLocal = false))
         return transformDeclaration(simpleFunction, data)
     }
@@ -246,7 +247,6 @@ abstract class AbstractFirStatusResolveTransformer(
         property: FirProperty,
         data: FirResolvedDeclarationStatus?
     ): CompositeTransformResult<FirDeclaration> {
-        if (!property.needResolve()) return property.compose()
         property.transformStatus(this, statusResolver.resolveStatus(property, containingClass, isLocal = false))
         return transformDeclaration(property, data)
     }
@@ -255,7 +255,6 @@ abstract class AbstractFirStatusResolveTransformer(
         field: FirField,
         data: FirResolvedDeclarationStatus?
     ): CompositeTransformResult<FirDeclaration> {
-        if (!field.needResolve()) return field.compose()
         field.transformStatus(this, statusResolver.resolveStatus(field, containingClass, isLocal = false))
         return transformDeclaration(field, data)
     }
@@ -264,7 +263,6 @@ abstract class AbstractFirStatusResolveTransformer(
         enumEntry: FirEnumEntry,
         data: FirResolvedDeclarationStatus?
     ): CompositeTransformResult<FirDeclaration> {
-        if (!enumEntry.needResolve()) return enumEntry.compose()
         enumEntry.transformStatus(this, statusResolver.resolveStatus(enumEntry, containingClass, isLocal = false))
         return transformDeclaration(enumEntry, data)
     }
@@ -273,7 +271,6 @@ abstract class AbstractFirStatusResolveTransformer(
         valueParameter: FirValueParameter,
         data: FirResolvedDeclarationStatus?
     ): CompositeTransformResult<FirStatement> {
-        if (!valueParameter.needResolve()) return valueParameter.compose()
         @Suppress("UNCHECKED_CAST")
         return transformDeclaration(valueParameter, data) as CompositeTransformResult<FirStatement>
     }
@@ -282,7 +279,6 @@ abstract class AbstractFirStatusResolveTransformer(
         typeParameter: FirTypeParameter,
         data: FirResolvedDeclarationStatus?
     ): CompositeTransformResult<FirDeclaration> {
-        if (!typeParameter.needResolve()) return typeParameter.compose()
         return transformDeclaration(typeParameter, data)
     }
 
@@ -429,6 +425,7 @@ class FirStatusResolver(
         }
         return overriddenStatuses.map { it.visibility }
             .maxWithOrNull { v1, v2 -> Visibilities.compare(v1, v2) ?: -1 }
+            ?.normalize()
             ?: Visibilities.Public
     }
 
