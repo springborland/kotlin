@@ -39,10 +39,10 @@ import org.jetbrains.kotlin.utils.sure
 open class IDEKotlinAsJavaSupport(private val project: Project) : KotlinAsJavaSupport() {
     private val psiManager: PsiManager = PsiManager.getInstance(project)
 
-    protected open fun createLightClassForSourceDeclaration(classOrObject: KtClassOrObject) =
+    protected open fun createLightClassForSourceDeclaration(classOrObject: KtClassOrObject): KtLightClass? =
         KtLightClassForSourceDeclaration.create(classOrObject)
 
-    protected open fun createLightClassForScript(script: KtScript) =
+    protected open fun createLightClassForScript(script: KtScript): KtLightClass? =
         KtLightClassForScript.create(script)
 
     protected open fun createLightClassForFacade(

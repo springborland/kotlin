@@ -6,8 +6,8 @@
 package org.jetbrains.kotlin.idea.asJava
 
 import com.intellij.psi.*
+import org.jetbrains.kotlin.asJava.*
 import org.jetbrains.kotlin.asJava.classes.KtLightClass
-import org.jetbrains.kotlin.asJava.toLightClass
 import org.jetbrains.kotlin.psi.*
 
 class LightClassProviderFirImpl : LightClassProvider {
@@ -15,33 +15,26 @@ class LightClassProviderFirImpl : LightClassProvider {
         return null
     }
 
-    override fun getLightClassMethods(function: KtFunction): List<PsiMethod> {
-        return emptyList()
-    }
+    override fun getLightClassMethods(function: KtFunction): List<PsiMethod> =
+        LightClassUtil.getLightClassMethods(function)
 
-    override fun getLightClassParameterDeclarations(parameter: KtParameter): List<PsiNamedElement> {
-        return emptyList()
-    }
+    override fun getLightClassParameterDeclarations(parameter: KtParameter): List<PsiNamedElement> =
+        LightClassUtil.getLightClassPropertyMethods(parameter).allDeclarations
 
-    override fun getLightClassPropertyDeclarations(property: KtProperty): List<PsiNamedElement> {
-        return emptyList()
-    }
+    override fun getLightClassPropertyDeclarations(property: KtProperty): List<PsiNamedElement> =
+        LightClassUtil.getLightClassPropertyMethods(property).allDeclarations
 
-    override fun toLightClassWithBuiltinMapping(classOrObject: KtClassOrObject): PsiClass? {
-        return null
-    }
+    override fun toLightClassWithBuiltinMapping(classOrObject: KtClassOrObject): PsiClass? =
+        null
 
-    override fun toLightMethods(psiElement: PsiElement): List<PsiMethod> {
-        return emptyList()
-    }
+    override fun toLightMethods(psiElement: PsiElement): List<PsiMethod> =
+        psiElement.toLightMethods()
 
-    override fun toLightClass(classOrObject: KtClassOrObject): KtLightClass? {
-        return classOrObject.toLightClass()
-    }
+    override fun toLightClass(classOrObject: KtClassOrObject): KtLightClass? =
+        classOrObject.toLightClass()
 
-    override fun toLightElements(ktElement: KtElement): List<PsiNamedElement> {
-        return emptyList()
-    }
+    override fun toLightElements(ktElement: KtElement): List<PsiNamedElement> =
+        ktElement.toLightElements()
 
     override fun createKtFakeLightClass(kotlinOrigin: KtClassOrObject): PsiClass? {
         return null

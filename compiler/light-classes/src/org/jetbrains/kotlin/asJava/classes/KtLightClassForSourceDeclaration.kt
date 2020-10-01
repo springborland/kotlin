@@ -550,6 +550,12 @@ fun KtClassOrObject.defaultJavaAncestorQualifiedName(): String? {
 }
 
 fun KtClassOrObject.shouldNotBeVisibleAsLightClass(): Boolean {
+
+    if (containingFile is KtCodeFragment) {
+        // Avoid building light classes for code fragments
+        return true
+    }
+
     if (parentsWithSelf.filterIsInstance<KtClassOrObject>().any { it.hasExpectModifier() }) {
         return true
     }
