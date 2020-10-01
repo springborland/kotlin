@@ -14,6 +14,9 @@ import org.jetbrains.kotlin.fir.resolve.ScopeSession
 import org.jetbrains.kotlin.fir.resolve.firProvider
 import org.jetbrains.kotlin.fir.resolve.firSymbolProvider
 import org.jetbrains.kotlin.fir.resolve.transformers.body.resolve.LocalClassesNavigationInfo
+import org.jetbrains.kotlin.fir.scopes.FirCompositeScope
+import org.jetbrains.kotlin.fir.scopes.FirScope
+import org.jetbrains.kotlin.fir.scopes.processClassifiersByName
 import org.jetbrains.kotlin.fir.types.classId
 import org.jetbrains.kotlin.fir.types.coneType
 import org.jetbrains.kotlin.fir.visitors.CompositeTransformResult
@@ -38,13 +41,16 @@ class FirStatusResolveProcessor(
 fun <F : FirClass<F>> F.runStatusResolveForLocalClass(
     session: FirSession,
     scopeSession: ScopeSession,
+    scopesForLocalClass: List<FirScope>,
     localClassesNavigationInfo: LocalClassesNavigationInfo
 ): F {
     val statusComputationSession = StatusComputationSession.ForLocalClassResolution(localClassesNavigationInfo.parentForClass.keys)
     val transformer = FirStatusResolveTransformer(
         session,
         scopeSession,
-        statusComputationSession
+        statusComputationSession,
+        localClassesNavigationInfo.parentForClass,
+        FirCompositeScope(scopesForLocalClass)
     )
 
     return this.transform<F, Nothing?>(transformer, null).single
@@ -67,8 +73,10 @@ abstract class ResolvedStatusCalculator {
 class FirStatusResolveTransformer(
     session: FirSession,
     scopeSession: ScopeSession,
-    statusComputationSession: StatusComputationSession
-) : AbstractFirStatusResolveTransformer(session, scopeSession, statusComputationSession) {
+    statusComputationSession: StatusComputationSession,
+    designationMapForLocalClasses: Map<FirClass<*>, FirClass<*>?> = mapOf(),
+    scopeForLocalClass: FirScope? = null,
+) : AbstractFirStatusResolveTransformer(session, scopeSession, statusComputationSession, designationMapForLocalClasses, scopeForLocalClass) {
     override fun FirDeclaration.needResolve(): Boolean {
         return true
     }
@@ -79,8 +87,10 @@ private class FirDesignatedStatusResolveTransformer(
     scopeSession: ScopeSession,
     private val designation: Iterator<FirDeclaration>,
     private val targetClass: FirClass<*>,
-    statusComputationSession: StatusComputationSession
-) : AbstractFirStatusResolveTransformer(session, scopeSession, statusComputationSession) {
+    statusComputationSession: StatusComputationSession,
+    designationMapForLocalClasses: Map<FirClass<*>, FirClass<*>?>,
+    scopeForLocalClass: FirScope?,
+) : AbstractFirStatusResolveTransformer(session, scopeSession, statusComputationSession, designationMapForLocalClasses, scopeForLocalClass) {
     private var currentElement: FirDeclaration? = null
     private var classLocated = false
 
@@ -145,7 +155,8 @@ abstract class AbstractFirStatusResolveTransformer(
     final override val session: FirSession,
     val scopeSession: ScopeSession,
     protected val statusComputationSession: StatusComputationSession,
-    protected val designationMapForLocalClasses: Map<FirClass<*>, FirClass<*>?> = mapOf()
+    protected val designationMapForLocalClasses: Map<FirClass<*>, FirClass<*>?>,
+    private val scopeForLocalClass: FirScope?
 ) : FirAbstractTreeTransformer<FirResolvedDeclarationStatus?>(phase = FirResolvePhase.STATUS) {
     private val classes = mutableListOf<FirClass<*>>()
     private val statusResolver = FirStatusResolver(session, scopeSession)
@@ -266,7 +277,22 @@ abstract class AbstractFirStatusResolveTransformer(
     private fun forceResolveStatusesOfSupertypes(regularClass: FirRegularClass) {
         for (superTypeRef in regularClass.superTypeRefs) {
             val classId = superTypeRef.coneType.classId ?: continue
-            val superClass = symbolProvider.getClassLikeSymbolByFqName(classId)?.fir as? FirRegularClass ?: continue
+
+            val superClass = when {
+                classId.isLocal -> {
+                    var parent = designationMapForLocalClasses[regularClass] as? FirRegularClass
+                    if (parent == null && scopeForLocalClass != null) {
+                        scopeForLocalClass.processClassifiersByName(classId.shortClassName) {
+                            if (it is FirRegularClass && it.classId == classId) {
+                                parent = it
+                            }
+                        }
+                    }
+                    parent
+                }
+                else -> symbolProvider.getClassLikeSymbolByFqName(classId)?.fir as? FirRegularClass
+            } ?: continue
+
             forceResolveStatusesOfClass(superClass)
         }
     }
@@ -294,7 +320,9 @@ abstract class AbstractFirStatusResolveTransformer(
             scopeSession,
             designation.iterator(),
             regularClass,
-            statusComputationSession
+            statusComputationSession,
+            designationMapForLocalClasses,
+            scopeForLocalClass
         )
         designation.first().transformSingle(transformer, null)
         statusComputationSession.endComputing(regularClass)
