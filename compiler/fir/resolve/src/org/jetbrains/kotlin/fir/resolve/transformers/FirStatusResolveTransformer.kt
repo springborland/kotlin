@@ -190,7 +190,22 @@ abstract class AbstractFirStatusResolveTransformer(
 
     override fun transformFile(file: FirFile, data: FirResolvedDeclarationStatus?): CompositeTransformResult<FirFile> {
         if (!file.needResolve()) return file.compose()
-        return super.transformFile(file, data)
+        file.replaceResolvePhase(transformerPhase)
+        if (file.needResolveMembers()) {
+            for (declaration in file.declarations) {
+                if (declaration !is FirClassLikeDeclaration<*>) {
+                    declaration.transformSingle(this, data)
+                }
+            }
+        }
+        if (file.needResolveNestedClassifiers()) {
+            for (declaration in file.declarations) {
+                if (declaration is FirClassLikeDeclaration<*>) {
+                    declaration.transformSingle(this, data)
+                }
+            }
+        }
+        return file.compose()
     }
 
     override fun transformDeclarationStatus(
