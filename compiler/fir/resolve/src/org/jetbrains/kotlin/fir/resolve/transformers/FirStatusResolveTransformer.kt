@@ -80,6 +80,14 @@ class FirStatusResolveTransformer(
     override fun FirDeclaration.needResolve(): Boolean {
         return true
     }
+
+    override fun FirDeclaration.needResolveMembers(): Boolean {
+        return true
+    }
+
+    override fun FirDeclaration.needResolveNestedClassifiers(): Boolean {
+        return true
+    }
 }
 
 private class FirDesignatedStatusResolveTransformer(
@@ -109,7 +117,11 @@ private class FirDesignatedStatusResolveTransformer(
         return result
     }
 
-    override fun alreadyResolved(declaration: FirCallableMemberDeclaration<*>): Boolean {
+    override fun FirDeclaration.needResolveMembers(): Boolean {
+        return classLocated
+    }
+
+    override fun FirDeclaration.needResolveNestedClassifiers(): Boolean {
         return !classLocated
     }
 }
@@ -167,18 +179,8 @@ abstract class AbstractFirStatusResolveTransformer(
     private val symbolProvider = session.firSymbolProvider
 
     protected abstract fun FirDeclaration.needResolve(): Boolean
-
-    protected open fun alreadyResolved(declaration: FirCallableMemberDeclaration<*>): Boolean {
-        val containingClass = containingClass
-        val result = containingClass != null &&
-                statusComputationSession[containingClass] == StatusComputationSession.StatusComputationStatus.Computed
-        if (result) {
-            assert(declaration.status is FirResolvedDeclarationStatus) {
-                "foo"
-            }
-        }
-        return result
-    }
+    protected abstract fun FirDeclaration.needResolveMembers(): Boolean
+    protected abstract fun FirDeclaration.needResolveNestedClassifiers(): Boolean
 
     override fun transformFile(file: FirFile, data: FirResolvedDeclarationStatus?): CompositeTransformResult<FirFile> {
         if (!file.needResolve()) return file.compose()
@@ -252,14 +254,18 @@ abstract class AbstractFirStatusResolveTransformer(
         return storeClass(regularClass) {
             regularClass.typeParameters.forEach { it.transformSingle(this, data) }
             regularClass.replaceResolvePhase(transformerPhase)
-            for (declaration in regularClass.declarations) {
-                if (declaration !is FirClassLikeDeclaration<*>) {
-                    declaration.transformSingle(this, data)
+            if (regularClass.needResolveMembers()) {
+                for (declaration in regularClass.declarations) {
+                    if (declaration !is FirClassLikeDeclaration<*>) {
+                        declaration.transformSingle(this, data)
+                    }
                 }
             }
-            for (declaration in regularClass.declarations) {
-                if (declaration is FirClassLikeDeclaration<*>) {
-                    declaration.transformSingle(this, data)
+            if (regularClass.needResolveNestedClassifiers()) {
+                for (declaration in regularClass.declarations) {
+                    if (declaration is FirClassLikeDeclaration<*>) {
+                        declaration.transformSingle(this, data)
+                    }
                 }
             }
             regularClass.compose()
@@ -342,7 +348,6 @@ abstract class AbstractFirStatusResolveTransformer(
         propertyAccessor: FirPropertyAccessor,
         data: FirResolvedDeclarationStatus?
     ): CompositeTransformResult<FirDeclaration> {
-        if (alreadyResolved(propertyAccessor)) return propertyAccessor.compose()
         propertyAccessor.transformStatus(this, statusResolver.resolveStatus(propertyAccessor, containingClass, isLocal = false))
         @Suppress("UNCHECKED_CAST")
         return transformDeclaration(propertyAccessor, data)
@@ -352,7 +357,6 @@ abstract class AbstractFirStatusResolveTransformer(
         constructor: FirConstructor,
         data: FirResolvedDeclarationStatus?
     ): CompositeTransformResult<FirDeclaration> {
-        if (alreadyResolved(constructor)) return constructor.compose()
         constructor.transformStatus(this, statusResolver.resolveStatus(constructor, containingClass, isLocal = false))
         return transformDeclaration(constructor, data)
     }
@@ -361,7 +365,6 @@ abstract class AbstractFirStatusResolveTransformer(
         simpleFunction: FirSimpleFunction,
         data: FirResolvedDeclarationStatus?
     ): CompositeTransformResult<FirDeclaration> {
-        if (alreadyResolved(simpleFunction)) return simpleFunction.compose()
         simpleFunction.replaceResolvePhase(transformerPhase)
         simpleFunction.transformStatus(this, statusResolver.resolveStatus(simpleFunction, containingClass, isLocal = false))
         return transformDeclaration(simpleFunction, data)
@@ -371,7 +374,6 @@ abstract class AbstractFirStatusResolveTransformer(
         property: FirProperty,
         data: FirResolvedDeclarationStatus?
     ): CompositeTransformResult<FirDeclaration> {
-        if (alreadyResolved(property)) return property.compose()
         property.replaceResolvePhase(transformerPhase)
         property.transformStatus(this, statusResolver.resolveStatus(property, containingClass, isLocal = false))
         return transformDeclaration(property, data)
@@ -381,7 +383,6 @@ abstract class AbstractFirStatusResolveTransformer(
         field: FirField,
         data: FirResolvedDeclarationStatus?
     ): CompositeTransformResult<FirDeclaration> {
-        if (alreadyResolved(field)) return field.compose()
         field.transformStatus(this, statusResolver.resolveStatus(field, containingClass, isLocal = false))
         return transformDeclaration(field, data)
     }
