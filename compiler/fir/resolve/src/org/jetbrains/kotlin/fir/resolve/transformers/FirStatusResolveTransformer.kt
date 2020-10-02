@@ -129,23 +129,25 @@ private class FirDesignatedStatusResolveTransformer(
 sealed class StatusComputationSession {
     abstract operator fun get(klass: FirClass<*>): StatusComputationStatus
 
+    abstract fun startComputing(klass: FirClass<*>)
     abstract fun endComputing(klass: FirClass<*>)
 
     enum class StatusComputationStatus {
-        NotComputed, Computed
+        NotComputed, Computing, Computed
     }
 
     class Regular : StatusComputationSession() {
-        private val classesWithComputedStatus = mutableSetOf<FirClass<*>>()
+        private val statusMap = mutableMapOf<FirClass<*>, StatusComputationStatus>()
+            .withDefault { StatusComputationStatus.NotComputed }
 
-        override fun get(klass: FirClass<*>): StatusComputationStatus = if (klass in classesWithComputedStatus) {
-            StatusComputationStatus.Computed
-        } else {
-            StatusComputationStatus.NotComputed
+        override fun get(klass: FirClass<*>): StatusComputationStatus = statusMap.getValue(klass)
+
+        override fun startComputing(klass: FirClass<*>) {
+            statusMap[klass] = StatusComputationStatus.Computing
         }
 
         override fun endComputing(klass: FirClass<*>) {
-            classesWithComputedStatus += klass
+            statusMap[klass] = StatusComputationStatus.Computed
         }
     }
 
@@ -155,6 +157,10 @@ sealed class StatusComputationSession {
         override fun get(klass: FirClass<*>): StatusComputationStatus {
             if (klass !in localClasses) return StatusComputationStatus.Computed
             return delegate[klass]
+        }
+
+        override fun startComputing(klass: FirClass<*>) {
+            delegate.startComputing(klass)
         }
 
         override fun endComputing(klass: FirClass<*>) {
@@ -247,6 +253,8 @@ abstract class AbstractFirStatusResolveTransformer(
         data: FirResolvedDeclarationStatus?
     ): CompositeTransformResult<FirStatement> {
         if (!regularClass.needResolve()) return regularClass.compose()
+        if (statusComputationSession[regularClass] == StatusComputationSession.StatusComputationStatus.Computing) return regularClass.compose()
+        statusComputationSession.startComputing(regularClass)
         forceResolveStatusesOfSupertypes(regularClass)
         updateResolvePhaseOfMembers(regularClass)
         regularClass.transformStatus(this, statusResolver.resolveStatus(regularClass, containingClass, isLocal = false))
