@@ -258,25 +258,38 @@ abstract class AbstractFirStatusResolveTransformer(
         forceResolveStatusesOfSupertypes(regularClass)
         updateResolvePhaseOfMembers(regularClass)
         regularClass.transformStatus(this, statusResolver.resolveStatus(regularClass, containingClass, isLocal = false))
+        return transformClass(regularClass, data)
+    }
+
+    override fun transformAnonymousObject(
+        anonymousObject: FirAnonymousObject,
+        data: FirResolvedDeclarationStatus?
+    ): CompositeTransformResult<FirStatement> {
         @Suppress("UNCHECKED_CAST")
-        return storeClass(regularClass) {
-            regularClass.typeParameters.forEach { it.transformSingle(this, data) }
-            regularClass.replaceResolvePhase(transformerPhase)
-            if (regularClass.needResolveMembers()) {
-                for (declaration in regularClass.declarations) {
-                    if (declaration !is FirClassLikeDeclaration<*>) {
-                        declaration.transformSingle(this, data)
-                    }
-                }
+        return transformClass(anonymousObject, data)
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    override fun <F : FirClass<F>> transformClass(
+        klass: FirClass<F>,
+        data: FirResolvedDeclarationStatus?
+    ): CompositeTransformResult<FirStatement> {
+        return storeClass(klass) {
+            klass.typeParameters.forEach { it.transformSingle(this, data) }
+            klass.replaceResolvePhase(transformerPhase)
+            if (klass.needResolveMembers()) {
+                val members = klass.declarations.filter { it !is FirClassLikeDeclaration<*> }
+                members.forEach { it.replaceResolvePhase(transformerPhase) }
+                members.forEach { it.transformSingle(this, data) }
             }
-            if (regularClass.needResolveNestedClassifiers()) {
-                for (declaration in regularClass.declarations) {
+            if (klass.needResolveNestedClassifiers()) {
+                for (declaration in klass.declarations) {
                     if (declaration is FirClassLikeDeclaration<*>) {
                         declaration.transformSingle(this, data)
                     }
                 }
             }
-            regularClass.compose()
+            klass.compose()
         } as CompositeTransformResult<FirStatement>
     }
 
@@ -340,16 +353,6 @@ abstract class AbstractFirStatusResolveTransformer(
         )
         designation.first().transformSingle(transformer, null)
         statusComputationSession.endComputing(regularClass)
-    }
-
-    override fun transformAnonymousObject(
-        anonymousObject: FirAnonymousObject,
-        data: FirResolvedDeclarationStatus?
-    ): CompositeTransformResult<FirStatement> {
-        @Suppress("UNCHECKED_CAST")
-        return storeClass(anonymousObject) {
-            transformDeclaration(anonymousObject, data)
-        } as CompositeTransformResult<FirStatement>
     }
 
     override fun transformPropertyAccessor(
