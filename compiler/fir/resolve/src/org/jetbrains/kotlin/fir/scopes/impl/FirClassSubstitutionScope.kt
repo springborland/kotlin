@@ -522,7 +522,11 @@ class FirClassSubstitutionScope(
             val copiedReturnType = newReturnType?.let {
                 substitutor.substituteOrNull(it)
             } ?: baseCallable.returnTypeRef.let {
-                substitutor.substituteOrNull(it.coneType)
+                try {
+                    substitutor.substituteOrNull(it.coneType)
+                } catch (e: ClassCastException) {
+                    TODO()
+                }
             }
             return copiedReceiverType to copiedReturnType
         }

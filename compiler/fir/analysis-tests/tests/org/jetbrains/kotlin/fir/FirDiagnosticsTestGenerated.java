@@ -2661,6 +2661,16 @@ public class FirDiagnosticsTestGenerated extends AbstractFirDiagnosticsTest {
             runTest("compiler/fir/analysis-tests/testData/resolve/visibility/kotlinJavaKotlinHierarchy.kt");
         }
 
+        @TestMetadata("intersectionOverrideWithImplicitTypes.kt")
+        public void testIntersectionOverrideWithImplicitTypes() throws Exception {
+            runTest("compiler/fir/analysis-tests/testData/resolve/visibility/intersectionOverrideWithImplicitTypes.kt");
+        }
+
+        @TestMetadata("kotlinJavaKotlinHierarchy.kt")
+        public void testKotlinJavaKotlinHierarchy() throws Exception {
+            runTest("compiler/fir/analysis-tests/testData/resolve/visibility/kotlinJavaKotlinHierarchy.kt");
+        }
+
         @TestMetadata("protectedInCompanion.kt")
         public void testProtectedInCompanion() throws Exception {
             runTest("compiler/fir/analysis-tests/testData/resolve/visibility/protectedInCompanion.kt");
