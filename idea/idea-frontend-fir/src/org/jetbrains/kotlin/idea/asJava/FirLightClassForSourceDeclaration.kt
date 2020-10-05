@@ -33,7 +33,7 @@ import org.jetbrains.kotlin.fir.types.ConeClassLikeType
 import org.jetbrains.kotlin.fir.types.ConeKotlinType
 import org.jetbrains.kotlin.fir.types.classId
 import org.jetbrains.kotlin.idea.fir.low.level.api.api.LowLevelFirApiFacade
-import org.jetbrains.kotlin.idea.search.ifTrue
+import org.jetbrains.kotlin.idea.util.ifTrue
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.load.java.structure.LightClassOriginKind
 import org.jetbrains.kotlin.load.kotlin.TypeMappingMode
