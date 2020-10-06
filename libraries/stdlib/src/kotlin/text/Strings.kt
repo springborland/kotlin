@@ -1306,7 +1306,7 @@ public expect infix fun CharSequence?.contentEquals(other: CharSequence?): Boole
  */
 public expect fun CharSequence?.contentEquals(other: CharSequence?, ignoreCase: Boolean): Boolean
 
-public fun CharSequence?.contentEqualsImpl(other: CharSequence?, ignoreCase: Boolean): Boolean {
+internal fun CharSequence?.contentEqualsImpl(other: CharSequence?, ignoreCase: Boolean): Boolean {
     if (this === other) return true
     if (this == null || other == null || this.length != other.length) return false
 

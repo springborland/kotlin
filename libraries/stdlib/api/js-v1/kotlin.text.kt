@@ -164,8 +164,6 @@ public infix fun kotlin.CharSequence?.contentEquals(other: kotlin.CharSequence?)
 
 public fun kotlin.CharSequence?.contentEquals(other: kotlin.CharSequence?, ignoreCase: kotlin.Boolean): kotlin.Boolean
 
-public fun kotlin.CharSequence?.contentEqualsImpl(other: kotlin.CharSequence?, ignoreCase: kotlin.Boolean): kotlin.Boolean
-
 @kotlin.internal.InlineOnly
 public inline fun kotlin.CharSequence.count(): kotlin.Int
 
