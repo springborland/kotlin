@@ -1,4 +1,5 @@
 // A
+// FIR_COMPARISON
 class A {
     inline fun test() {
         {
