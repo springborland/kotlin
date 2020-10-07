@@ -146,7 +146,7 @@ private fun testLightClass(expected: File, testData: File, normalize: (String) -
     )
 }
 
-private fun findClass(fqName: String, ktFile: KtFile?, project: Project): PsiClass? {
+fun findClass(fqName: String, ktFile: KtFile?, project: Project): PsiClass? {
     ktFile?.script?.let {
         return it.toLightClass()
     }
