@@ -108,6 +108,9 @@ private fun compileImpl(
     context: SharedScriptCompilationContext,
     messageCollector: ScriptDiagnosticsMessageCollector
 ): ResultWithDiagnostics<CompiledScript> {
+
+    context.environment.configuration.put(JVMConfigurationKeys.IR, true)
+
     val mainKtFile =
         getScriptKtFile(
             script,
