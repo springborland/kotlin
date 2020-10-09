@@ -72,7 +72,7 @@ class ScriptGenerator(declarationGenerator: DeclarationGenerator) : DeclarationG
                             context
                         ).generateExpressionBody(d.body!!)
                         if (d == ktScript.declarations.last() && descriptor.resultValue != null) {
-                            descriptor.resultValue?.let { resultDescriptor ->
+                            descriptor.resultValue!!.let { resultDescriptor ->
                                 PropertyGenerator(declarationGenerator)
                                     .generateSyntheticPropertyWithInitializer(ktScript, resultDescriptor, generateSyntheticAccessors = true) {
                                         // TODO: check if this is a correct place to do it
