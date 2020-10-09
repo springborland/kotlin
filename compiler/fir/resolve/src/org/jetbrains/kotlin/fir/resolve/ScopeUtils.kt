@@ -23,7 +23,7 @@ import org.jetbrains.kotlin.fir.types.impl.ConeClassLikeTypeImpl
 import org.jetbrains.kotlin.fir.types.impl.ConeTypeParameterTypeImpl
 
 fun ConeKotlinType.scope(useSiteSession: FirSession, scopeSession: ScopeSession): FirTypeScope? =
-    scope(useSiteSession, scopeSession, FirResolvePhase.STATUS)
+    scope(useSiteSession, scopeSession, FirResolvePhase.DECLARATIONS)
 
 fun ConeKotlinType.scopeForStatusResolve(useSiteSession: FirSession, scopeSession: ScopeSession): FirTypeScope? =
     scope(useSiteSession, scopeSession, FirResolvePhase.TYPES)
