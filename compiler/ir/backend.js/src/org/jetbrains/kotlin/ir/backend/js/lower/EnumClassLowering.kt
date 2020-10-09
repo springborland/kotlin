@@ -89,7 +89,7 @@ private fun createEntryAccessorName(enumName: String, enumEntry: IrEnumEntry) =
 private fun IrEnumEntry.getType(irClass: IrClass) = (correspondingClass ?: irClass).defaultType
 
 // Should be applied recursively
-class EnumClassConstructorLowering(val context: JsCommonBackendContext) : DeclarationTransformer {
+class EnumClassConstructorLowering(val context: JsCommonBackendContext) : DeclarationTransformer() {
 
     private var IrConstructor.newConstructor by context.mapping.enumConstructorToNewConstructor
     private var IrClass.correspondingEntry by context.mapping.enumClassToCorrespondingEnumEntry
@@ -308,7 +308,7 @@ class EnumClassConstructorBodyTransformer(val context: JsCommonBackendContext) :
 private val IrClass.goodEnum: Boolean
     get() = isEnumClass && !isExpect && !isEffectivelyExternal()
 
-class EnumEntryInstancesLowering(val context: JsIrBackendContext) : DeclarationTransformer {
+class EnumEntryInstancesLowering(val context: JsIrBackendContext) : DeclarationTransformer() {
 
     private var IrEnumEntry.correspondingField by context.mapping.enumEntryToCorrespondingField
 
@@ -365,7 +365,7 @@ class EnumEntryInstancesBodyLowering(val context: JsIrBackendContext) : BodyLowe
     }
 }
 
-class EnumClassCreateInitializerLowering(val context: JsIrBackendContext) : DeclarationTransformer {
+class EnumClassCreateInitializerLowering(val context: JsIrBackendContext) : DeclarationTransformer() {
 
     private var IrEnumEntry.correspondingField by context.mapping.enumEntryToCorrespondingField
     private var IrClass.initEntryInstancesFun: IrSimpleFunction? by context.mapping.enumClassToInitEntryInstancesFun
@@ -426,7 +426,7 @@ class EnumClassCreateInitializerLowering(val context: JsIrBackendContext) : Decl
         }
 }
 
-class EnumEntryCreateGetInstancesFunsLowering(val context: JsIrBackendContext): DeclarationTransformer {
+class EnumEntryCreateGetInstancesFunsLowering(val context: JsIrBackendContext): DeclarationTransformer() {
 
     private var IrEnumEntry.correspondingField by context.mapping.enumEntryToCorrespondingField
     private var IrClass.initEntryInstancesFun: IrSimpleFunction? by context.mapping.enumClassToInitEntryInstancesFun
@@ -472,7 +472,7 @@ class EnumEntryCreateGetInstancesFunsLowering(val context: JsIrBackendContext): 
         }
 }
 
-class EnumSyntheticFunctionsLowering(val context: JsIrBackendContext): DeclarationTransformer {
+class EnumSyntheticFunctionsLowering(val context: JsIrBackendContext): DeclarationTransformer() {
 
     private var IrEnumEntry.getInstanceFun by context.mapping.enumEntryToGetInstanceFun
 
@@ -546,7 +546,7 @@ private val IrClass.enumEntries: List<IrEnumEntry>
     get() = declarations.filterIsInstance<IrEnumEntry>()
 
 // Should be applied recursively
-class EnumClassRemoveEntriesLowering(val context: JsIrBackendContext) : DeclarationTransformer {
+class EnumClassRemoveEntriesLowering(val context: JsIrBackendContext) : DeclarationTransformer() {
     override fun transformFlat(declaration: IrDeclaration): List<IrDeclaration>? {
         // Remove IrEnumEntry nodes from class declarations. Replace them with corresponding class declarations (if they have them).
         if (declaration is IrEnumEntry && !declaration.isExpect && !declaration.isEffectivelyExternal()) {

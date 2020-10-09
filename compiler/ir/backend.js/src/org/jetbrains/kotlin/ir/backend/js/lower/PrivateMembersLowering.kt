@@ -24,7 +24,7 @@ import org.jetbrains.kotlin.name.Name
 
 private val STATIC_THIS_PARAMETER = object : IrDeclarationOriginImpl("STATIC_THIS_PARAMETER") {}
 
-class PrivateMembersLowering(val context: JsIrBackendContext) : DeclarationTransformer {
+class PrivateMembersLowering(val context: JsIrBackendContext) : DeclarationTransformer() {
 
     private var IrFunction.correspondingStatic by context.mapping.privateMemberToCorrespondingStatic
 

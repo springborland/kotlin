@@ -40,7 +40,7 @@ open class DefaultArgumentStubGenerator(
     private val skipInlineMethods: Boolean = true,
     private val skipExternalMethods: Boolean = false,
     private val forceSetOverrideSymbols: Boolean = true
-) : DeclarationTransformer {
+) : DeclarationTransformer() {
 
     override fun lower(irFile: IrFile) {
         runPostfix(true).toFileLoweringPass().lower(irFile)
@@ -447,7 +447,7 @@ open class DefaultParameterInjector(
 class DefaultParameterCleaner(
     val context: CommonBackendContext,
     val replaceDefaultValuesWithStubs: Boolean = false
-) : DeclarationTransformer {
+) : DeclarationTransformer() {
     override fun lower(irFile: IrFile) {
         runPostfix(true).toFileLoweringPass().lower(irFile)
     }
@@ -471,7 +471,7 @@ class DefaultParameterCleaner(
 // Sets overriden symbols. Should be used in case `forceSetOverrideSymbols = false`
 class DefaultParameterPatchOverridenSymbolsLowering(
     val context: CommonBackendContext
-) : DeclarationTransformer {
+) : DeclarationTransformer() {
     override fun transformFlat(declaration: IrDeclaration): List<IrDeclaration>? {
         if (declaration is IrSimpleFunction) {
             (context.mapping.defaultArgumentsOriginalFunction[declaration] as? IrSimpleFunction)?.run {

@@ -35,7 +35,7 @@ import org.jetbrains.kotlin.ir.util.resolveFakeOverride
 import org.jetbrains.kotlin.ir.visitors.IrElementTransformerVoid
 import org.jetbrains.kotlin.ir.visitors.transformChildrenVoid
 
-class NullableFieldsForLateinitCreationLowering(val backendContext: CommonBackendContext) : DeclarationTransformer {
+class NullableFieldsForLateinitCreationLowering(val backendContext: CommonBackendContext) : DeclarationTransformer() {
 
     override fun lower(irFile: IrFile) {
         runPostfix(true).toFileLoweringPass().lower(irFile)
@@ -55,7 +55,7 @@ class NullableFieldsForLateinitCreationLowering(val backendContext: CommonBacken
 }
 
 // Transform declarations
-class NullableFieldsDeclarationLowering(val backendContext: CommonBackendContext) : DeclarationTransformer {
+class NullableFieldsDeclarationLowering(val backendContext: CommonBackendContext) : DeclarationTransformer() {
 
     override fun lower(irFile: IrFile) {
         runPostfix(true).toFileLoweringPass().lower(irFile)

@@ -27,9 +27,7 @@ import org.jetbrains.kotlin.ir.visitors.IrElementTransformerVoid
 import org.jetbrains.kotlin.ir.visitors.transformChildrenVoid
 import org.jetbrains.kotlin.name.Name
 
-class ObjectDeclarationLowering(
-    val context: JsCommonBackendContext
-) : DeclarationTransformer {
+class ObjectDeclarationLowering(val context: JsCommonBackendContext) : DeclarationTransformer() {
 
     private var IrClass.instanceField by context.mapping.objectToInstanceField
     private var IrClass.syntheticPrimaryConstructor by context.mapping.classToSyntheticPrimaryConstructor

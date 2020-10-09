@@ -14,7 +14,7 @@ import org.jetbrains.kotlin.ir.expressions.impl.IrBlockImpl
 import org.jetbrains.kotlin.ir.util.isEffectivelyExternal
 import org.jetbrains.kotlin.ir.visitors.*
 
-class PropertiesLowering : DeclarationTransformer {
+class PropertiesLowering : DeclarationTransformer() {
     override fun lower(irFile: IrFile) {
         runPostfix(true).toFileLoweringPass().lower(irFile)
     }

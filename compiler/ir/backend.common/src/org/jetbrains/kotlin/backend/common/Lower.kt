@@ -191,8 +191,8 @@ fun FunctionLoweringPass.runOnFilePostfix(irFile: IrFile) {
     })
 }
 
-interface DeclarationTransformer : FileLoweringPass {
-    fun transformFlat(declaration: IrDeclaration): List<IrDeclaration>?
+abstract class DeclarationTransformer : FileLoweringPass {
+    abstract fun transformFlat(declaration: IrDeclaration): List<IrDeclaration>?
 
     override fun lower(irFile: IrFile) {
         runPostfix().toFileLoweringPass().lower(irFile)
@@ -214,7 +214,7 @@ fun DeclarationTransformer.toFileLoweringPass(): FileLoweringPass {
 }
 
 fun DeclarationTransformer.runPostfix(withLocalDeclarations: Boolean = false): DeclarationTransformer {
-    return object : DeclarationTransformer {
+    return object : DeclarationTransformer() {
         override fun transformFlat(declaration: IrDeclaration): List<IrDeclaration>? {
             declaration.acceptVoid(PostfixDeclarationTransformer(withLocalDeclarations, this@runPostfix))
 

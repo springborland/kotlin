@@ -26,7 +26,7 @@ private const val INLINE_CLASS_IMPL_SUFFIX = "-impl"
 class InlineClassLowering(val context: CommonBackendContext) {
     private val transformedFunction = context.mapping.inlineClassMemberToStatic
 
-    val inlineClassDeclarationLowering = object : DeclarationTransformer {
+    val inlineClassDeclarationLowering = object : DeclarationTransformer() {
 
         override fun transformFlat(declaration: IrDeclaration): List<IrDeclaration>? {
             val irClass = declaration.parent as? IrClass ?: return null

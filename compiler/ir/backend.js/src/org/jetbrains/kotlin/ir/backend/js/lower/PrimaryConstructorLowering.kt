@@ -22,7 +22,7 @@ import org.jetbrains.kotlin.ir.visitors.IrElementTransformerVoid
 import org.jetbrains.kotlin.ir.visitors.transformChildrenVoid
 
 // Create primary constructor if it doesn't exist
-class PrimaryConstructorLowering(context: JsCommonBackendContext) : DeclarationTransformer {
+class PrimaryConstructorLowering(context: JsCommonBackendContext) : DeclarationTransformer() {
 
     private var IrClass.syntheticPrimaryConstructor by context.mapping.classToSyntheticPrimaryConstructor
 

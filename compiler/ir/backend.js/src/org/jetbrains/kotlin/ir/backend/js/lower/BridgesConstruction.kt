@@ -45,7 +45,7 @@ import org.jetbrains.kotlin.ir.util.*
 //          }
 //
 @OptIn(ObsoleteDescriptorBasedAPI::class)
-class BridgesConstruction(val context: JsCommonBackendContext) : DeclarationTransformer {
+class BridgesConstruction(val context: JsCommonBackendContext) : DeclarationTransformer() {
 
     private val specialBridgeMethods = SpecialBridgeMethods(context)
 

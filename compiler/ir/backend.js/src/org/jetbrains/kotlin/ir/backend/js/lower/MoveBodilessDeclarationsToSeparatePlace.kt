@@ -77,7 +77,7 @@ fun moveBodilessDeclarationsToSeparatePlace(context: JsIrBackendContext, moduleF
     }
 }
 
-class MoveBodilessDeclarationsToSeparatePlaceLowering(private val context: JsIrBackendContext) : DeclarationTransformer {
+class MoveBodilessDeclarationsToSeparatePlaceLowering(private val context: JsIrBackendContext) : DeclarationTransformer() {
 
     override fun transformFlat(declaration: IrDeclaration): List<IrDeclaration>? {
         val irFile = declaration.parent as? IrFile ?: return null

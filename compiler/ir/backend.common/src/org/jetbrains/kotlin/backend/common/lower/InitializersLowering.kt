@@ -87,7 +87,7 @@ abstract class InitializersLoweringBase(open val context: CommonBackendContext) 
 class InitializersCleanupLowering(
     val context: CommonBackendContext,
     private val shouldEraseFieldInitializer: (IrField) -> Boolean = { it.correspondingPropertySymbol?.owner?.isConst != true }
-) : DeclarationTransformer {
+) : DeclarationTransformer() {
 
     override fun lower(irFile: IrFile) {
         runPostfix(withLocalDeclarations = true).toFileLoweringPass().lower(irFile)

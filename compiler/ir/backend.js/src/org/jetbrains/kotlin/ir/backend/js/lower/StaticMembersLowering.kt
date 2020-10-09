@@ -13,7 +13,7 @@ import org.jetbrains.kotlin.ir.util.file
 import org.jetbrains.kotlin.ir.util.isEffectivelyExternal
 
 // Move static member declarations from classes to top level
-class StaticMembersLowering(val context: JsIrBackendContext) : DeclarationTransformer {
+class StaticMembersLowering(val context: JsIrBackendContext) : DeclarationTransformer() {
     override fun transformFlat(declaration: IrDeclaration): List<IrDeclaration>? {
         (declaration.parent as? IrClass)?.let { irClass ->
             val isStatic = when (declaration) {

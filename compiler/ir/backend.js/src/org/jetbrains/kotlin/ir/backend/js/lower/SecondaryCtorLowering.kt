@@ -33,7 +33,7 @@ import org.jetbrains.kotlin.ir.visitors.IrElementTransformerVoid
 import org.jetbrains.kotlin.ir.visitors.transformChildrenVoid
 import org.jetbrains.kotlin.name.Name
 
-class SecondaryConstructorLowering(val context: JsIrBackendContext) : DeclarationTransformer {
+class SecondaryConstructorLowering(val context: JsIrBackendContext) : DeclarationTransformer() {
 
     override fun transformFlat(declaration: IrDeclaration): List<IrDeclaration>? {
         if (context.es6mode) return null

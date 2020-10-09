@@ -13,7 +13,7 @@ import org.jetbrains.kotlin.ir.declarations.IrDeclaration
 import org.jetbrains.kotlin.ir.expressions.impl.IrInstanceInitializerCallImpl
 import org.jetbrains.kotlin.ir.util.parentAsClass
 
-class AnnotationConstructorLowering(context: CommonBackendContext) : DeclarationTransformer {
+class AnnotationConstructorLowering(context: CommonBackendContext) : DeclarationTransformer() {
 
     private val unitType = context.irBuiltIns.unitType
 

@@ -16,7 +16,7 @@ import org.jetbrains.kotlin.ir.types.IrErrorType
 import org.jetbrains.kotlin.ir.visitors.IrElementTransformerVoid
 import org.jetbrains.kotlin.ir.visitors.transformChildrenVoid
 
-abstract class ErrorDeclarationLowering : DeclarationTransformer {
+abstract class ErrorDeclarationLowering : DeclarationTransformer() {
     abstract fun transformErrorDeclaration(declaration: IrErrorDeclaration): IrDeclaration
     override fun transformFlat(declaration: IrDeclaration): List<IrDeclaration>? {
         if (declaration is IrErrorDeclaration) return listOf(transformErrorDeclaration(declaration))
