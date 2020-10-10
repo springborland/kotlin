@@ -32,13 +32,11 @@ import org.jetbrains.kotlin.checkers.BaseDiagnosticsTest
 import org.jetbrains.kotlin.checkers.diagnostics.SyntaxErrorDiagnostic
 import org.jetbrains.kotlin.checkers.utils.CheckerTestUtil
 import org.jetbrains.kotlin.checkers.utils.DiagnosticsRenderingConfiguration
+import org.jetbrains.kotlin.daemon.common.OSKind
 import org.jetbrains.kotlin.descriptors.impl.ModuleDescriptorImpl
 import org.jetbrains.kotlin.diagnostics.AbstractDiagnostic
 import org.jetbrains.kotlin.idea.caches.resolve.getResolutionFacade
-import org.jetbrains.kotlin.idea.codeMetaInfo.models.CodeMetaInfoFactory
-import org.jetbrains.kotlin.idea.codeMetaInfo.models.DiagnosticCodeMetaInfo
-import org.jetbrains.kotlin.idea.codeMetaInfo.models.HighlightingCodeMetaInfo
-import org.jetbrains.kotlin.idea.codeMetaInfo.models.ICodeMetaInfo
+import org.jetbrains.kotlin.idea.codeMetaInfo.models.*
 import org.jetbrains.kotlin.idea.codeMetaInfo.renderConfigurations.AbstractCodeMetaInfoRenderConfiguration
 import org.jetbrains.kotlin.idea.codeMetaInfo.renderConfigurations.DiagnosticCodeMetaInfoRenderConfiguration
 import org.jetbrains.kotlin.idea.codeMetaInfo.renderConfigurations.HighlightingRenderConfiguration
@@ -144,10 +142,25 @@ class CodeMetaInfoTestCase(val codeMetaInfoTypes: Collection<AbstractCodeMetaInf
             !codeMetaInfoTypes.any { it is HighlightingRenderConfiguration }
         ) {
             checkHighlightErrorItemsInDiagnostics(
-                getDiagnosticCodeMetaInfos(null, false).filterIsInstance<DiagnosticCodeMetaInfo>()
+                getDiagnosticCodeMetaInfos(DiagnosticCodeMetaInfoRenderConfiguration(), false).filterIsInstance<DiagnosticCodeMetaInfo>()
             )
         }
-
+        val parsedMetaInfo = CodeMetaInfoParser.getCodeMetaInfoFromText(expectedFile.readText()).toMutableList()
+        codeMetaInfoForCheck.forEach { codeMetaInfo ->
+            val correspondingParsed = parsedMetaInfo.firstOrNull { it == codeMetaInfo }
+            if (correspondingParsed != null) {
+                parsedMetaInfo.remove(correspondingParsed)
+                codeMetaInfo.platforms.addAll(correspondingParsed.platforms)
+                if (correspondingParsed.platforms.isNotEmpty() && OSKind.current.toString() !in correspondingParsed.platforms)
+                    codeMetaInfo.platforms.add(OSKind.current.toString())
+            }
+        }
+        if (parsedMetaInfo.isNotEmpty())
+            parsedMetaInfo.forEach {
+                if (it.platforms.isNotEmpty() && OSKind.current.toString() !in it.platforms) codeMetaInfoForCheck.add(
+                    it
+                )
+            }
         val textWithCodeMetaInfo = CodeMetaInfoRenderer.renderTagsToText(codeMetaInfoForCheck, myEditor.document.text)
         KotlinTestUtils.assertEqualsToFile(
             expectedFile,
