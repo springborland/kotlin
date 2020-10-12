@@ -52,43 +52,53 @@ class IrTypeMapper(private val context: JvmBackendContext) : KotlinTypeMapperBas
                 error("Unknown descriptor: $classifier")
         }
 
-    fun classInternalName(irClass: IrClass): String = getClassInternalName(irClass.symbol)
+    private fun computeClassInternalName(sb: StringBuilder, irClass: IrClass) {
+        val shortName = SpecialNames.safeIdentifier(irClass.name).identifier
 
-    override fun getClassInternalName(typeConstructor: TypeConstructorMarker): String {
-        val irClass = (typeConstructor as IrClassSymbol).owner
-        fun report(): Nothing {
-            error(
-                "Local class should have its name computed in InventNamesForLocalClasses: ${irClass.fqNameWhenAvailable}\n" +
-                        "Ensure that any lowering that transforms elements with local class info (classes, function references) " +
-                        "invokes `copyAttributes` on the transformed element."
-            )
-        }
-
-        context.getLocalClassType(irClass)?.internalName?.let { return it }
-
-        context.classNameOverride[irClass]?.let { return it.internalName }
-
-        val className = SpecialNames.safeIdentifier(irClass.name).identifier
-
-        val internalName = when (val parent = irClass.parent) {
+        when (val parent = irClass.parent) {
             is IrPackageFragment -> {
                 val fqName = parent.fqName
                 val prefix = if (fqName.isRoot) "" else fqName.asString().replace('.', '/') + "/"
-                prefix + className
+                sb.append(prefix)
+                sb.append(shortName)
+                return
             }
             is IrClass -> {
-                getClassInternalName(parent.symbol) + "$" + className
+                computeClassInternalName(sb, parent.symbol.owner)
+                sb.append("$")
+                sb.append(shortName)
+                return
             }
             is IrFunction -> {
                 if (parent.isSuspend && parent.parentAsClass.origin == JvmLoweredDeclarationOrigin.DEFAULT_IMPLS) {
                     val interfaceClass = parent.parentAsClass.parent as IrClass
-                    getClassInternalName(interfaceClass.symbol) + "$" + parent.name.asString()
-                } else report()
+                    computeClassInternalName(sb, interfaceClass.symbol.owner)
+                    sb.append("$")
+                    sb.append(parent.name.asString())
+                    return
+                }
             }
-            else -> report()
+        }
+
+        error(
+            "Local class should have its name computed in InventNamesForLocalClasses: ${irClass.fqNameWhenAvailable}\n" +
+                    "Ensure that any lowering that transforms elements with local class info (classes, function references) " +
+                    "invokes `copyAttributes` on the transformed element."
+        )
+    }
+
+    fun classInternalName(irClass: IrClass): String {
+        context.getLocalClassType(irClass)?.internalName?.let { return it }
+        context.classNameOverride[irClass]?.let { return it.internalName }
+
+        val internalName = buildString {
+            computeClassInternalName(this, irClass)
         }
         return JvmCodegenUtil.sanitizeNameIfNeeded(internalName, context.state.languageVersionSettings)
     }
+
+    override fun getClassInternalName(typeConstructor: TypeConstructorMarker): String =
+        classInternalName((typeConstructor as IrClassSymbol).owner)
 
     fun writeFormalTypeParameters(irParameters: List<IrTypeParameter>, sw: JvmSignatureWriter) {
         if (sw.skipGenericSignature()) return
