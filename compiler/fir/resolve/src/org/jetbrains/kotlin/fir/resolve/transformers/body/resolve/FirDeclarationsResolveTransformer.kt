@@ -99,6 +99,10 @@ open class FirDeclarationsResolveTransformer(transformer: FirBodyResolveTransfor
         }
     }
 
+    private object HasResolvedBody : FirDeclarationDataKey()
+
+    var FirCallableDeclaration<*>.hasResolvedBody: Boolean? by FirDeclarationDataRegistry.data(HasResolvedBody)
+
     override fun transformProperty(property: FirProperty, data: ResolutionMode): CompositeTransformResult<FirProperty> {
         require(property !is FirSyntheticProperty) { "Synthetic properties should not be processed by body transfromers" }
 
@@ -114,7 +118,7 @@ open class FirDeclarationsResolveTransformer(transformer: FirBodyResolveTransfor
             val returnTypeRef = property.returnTypeRef
             if (returnTypeRef !is FirImplicitTypeRef && implicitTypeOnly) return@withTypeParametersOf property.compose()
             if (property.resolvePhase == transformerPhase) return@withTypeParametersOf property.compose()
-            if (property.resolvePhase == FirResolvePhase.IMPLICIT_TYPES_BODY_RESOLVE && transformerPhase == FirResolvePhase.BODY_RESOLVE) {
+            if (property.hasResolvedBody == true) {
                 property.replaceResolvePhase(transformerPhase)
                 return@withTypeParametersOf property.compose()
             }
@@ -142,6 +146,7 @@ open class FirDeclarationsResolveTransformer(transformer: FirBodyResolveTransfor
                         }
                     }
                     property.replaceResolvePhase(transformerPhase)
+                    property.hasResolvedBody = true
                     dataFlowAnalyzer.exitProperty(property)?.let {
                         property.replaceControlFlowGraphReference(FirControlFlowGraphReferenceImpl(it))
                     }
@@ -446,13 +451,13 @@ open class FirDeclarationsResolveTransformer(transformer: FirBodyResolveTransfor
         simpleFunction: FirSimpleFunction,
         data: ResolutionMode
     ): CompositeTransformResult<FirSimpleFunction> {
-        if (simpleFunction.resolvePhase == transformerPhase) return simpleFunction.compose()
-        if (simpleFunction.resolvePhase == FirResolvePhase.IMPLICIT_TYPES_BODY_RESOLVE && transformerPhase == FirResolvePhase.BODY_RESOLVE) {
-            simpleFunction.replaceResolvePhase(transformerPhase)
-            return simpleFunction.compose()
-        }
         val returnTypeRef = simpleFunction.returnTypeRef
         if ((returnTypeRef !is FirImplicitTypeRef) && implicitTypeOnly) {
+            return simpleFunction.compose()
+        }
+        if (simpleFunction.resolvePhase == transformerPhase) return simpleFunction.compose()
+        if (simpleFunction.hasResolvedBody == true) {
+            simpleFunction.replaceResolvePhase(transformerPhase)
             return simpleFunction.compose()
         }
 
@@ -516,7 +521,7 @@ open class FirDeclarationsResolveTransformer(transformer: FirBodyResolveTransfor
         data: ResolutionMode
     ): CompositeTransformResult<FirStatement> {
         return withNewLocalScope {
-            val functionIsNotAnalyzed = transformerPhase != function.resolvePhase
+            val functionIsNotAnalyzed = function.hasResolvedBody != true
             if (functionIsNotAnalyzed) {
                 dataFlowAnalyzer.enterFunction(function)
             }
@@ -526,6 +531,7 @@ open class FirDeclarationsResolveTransformer(transformer: FirBodyResolveTransfor
                     val result = it.single as FirFunction<*>
                     val controlFlowGraphReference = dataFlowAnalyzer.exitFunction(result)
                     result.replaceControlFlowGraphReference(controlFlowGraphReference)
+                    function.hasResolvedBody = true
                 }
             } as CompositeTransformResult<FirStatement>
         }
@@ -546,6 +552,7 @@ open class FirDeclarationsResolveTransformer(transformer: FirBodyResolveTransfor
     private fun doTransformConstructor(constructor: FirConstructor, data: ResolutionMode): CompositeTransformResult<FirConstructor> {
         return context.withContainer(constructor) {
             constructor.replaceResolvePhase(transformerPhase)
+            constructor.hasResolvedBody = true
             dataFlowAnalyzer.enterFunction(constructor)
 
             constructor.transformTypeParameters(transformer, data)
