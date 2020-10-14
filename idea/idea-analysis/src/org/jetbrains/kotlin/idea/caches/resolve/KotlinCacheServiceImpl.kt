@@ -142,6 +142,11 @@ class KotlinCacheServiceImpl(val project: Project) : KotlinCacheService {
             }
         }
 
+    @Synchronized
+    override fun clearCaches() {
+        globalFacadesPerPlatformAndSdk.clear()
+    }
+
     private val facadeForScriptDependenciesForProject = createFacadeForScriptDependencies(ScriptDependenciesInfo.ForProject(project))
 
     private fun createFacadeForScriptDependencies(

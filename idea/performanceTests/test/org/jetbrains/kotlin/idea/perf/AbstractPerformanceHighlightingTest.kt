@@ -10,6 +10,7 @@ import com.intellij.openapi.application.runWriteAction
 import com.intellij.testFramework.RunAll
 import com.intellij.testFramework.fixtures.impl.CodeInsightTestFixtureImpl.ensureIndexesUpToDate
 import com.intellij.util.ThrowableRunnable
+import org.jetbrains.kotlin.caches.resolve.KotlinCacheService
 import org.jetbrains.kotlin.idea.KotlinFileType
 import org.jetbrains.kotlin.idea.perf.Stats.Companion.WARM_UP
 import org.jetbrains.kotlin.idea.perf.util.removeInfoMarkers
@@ -71,6 +72,7 @@ abstract class AbstractPerformanceHighlightingTest : KotlinLightCodeInsightFixtu
 
             // to load AST for changed files before it's prohibited by "fileTreeAccessFilter"
             ensureIndexesUpToDate(project)
+            KotlinCacheService.getInstance(project).clearCaches()
         }
     }
 
