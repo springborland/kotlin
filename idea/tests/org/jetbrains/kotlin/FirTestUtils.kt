@@ -39,7 +39,7 @@ inline fun doTestWithFIRFlags(mainFileText: String, body: () -> Unit) {
     try {
         body()
     } catch (e: Throwable) {
-        if (isFirComparison) throw e
+         throw e
         return
     }
     if (!isFirComparison) {

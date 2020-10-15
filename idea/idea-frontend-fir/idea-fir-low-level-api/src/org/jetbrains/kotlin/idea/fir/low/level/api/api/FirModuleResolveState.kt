@@ -5,6 +5,7 @@
 
 package org.jetbrains.kotlin.idea.fir.low.level.api.api
 
+import com.intellij.openapi.project.Project
 import org.jetbrains.kotlin.diagnostics.Diagnostic
 import org.jetbrains.kotlin.fir.FirElement
 import org.jetbrains.kotlin.fir.FirSession
@@ -25,9 +26,11 @@ import org.jetbrains.kotlin.psi.KtElement
 import org.jetbrains.kotlin.psi.KtFile
 
 abstract class FirModuleResolveState {
+    abstract val project: Project
+
     abstract val rootModuleSession: FirSession
 
-    internal abstract val moduleInfo: IdeaModuleInfo
+    abstract val moduleInfo: IdeaModuleInfo
 
     abstract val firTransformerProvider: FirTransformerProvider
 

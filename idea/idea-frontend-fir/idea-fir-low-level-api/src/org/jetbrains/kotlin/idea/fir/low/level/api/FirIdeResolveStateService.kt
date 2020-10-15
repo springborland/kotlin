@@ -36,6 +36,7 @@ internal class FirIdeResolveStateService(project: Project) {
         val sessionProvider = sessionProviderStorage.getSessionProvider(moduleInfo)
         val firFileBuilder = sessionProvider.rootModuleSession.firFileBuilder
         return FirModuleResolveStateImpl(
+            moduleInfo.project,
             moduleInfo,
             sessionProvider,
             firFileBuilder,
