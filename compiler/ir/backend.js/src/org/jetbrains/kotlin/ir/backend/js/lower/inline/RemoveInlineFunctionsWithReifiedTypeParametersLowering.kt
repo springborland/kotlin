@@ -13,8 +13,10 @@ import org.jetbrains.kotlin.ir.declarations.IrValueParameter
 import org.jetbrains.kotlin.ir.expressions.IrBlockBody
 import org.jetbrains.kotlin.ir.util.deepCopyWithSymbols
 
-class RemoveInlineFunctionsWithReifiedTypeParametersLowering : DeclarationTransformer() {
+class RemoveInlineFunctionsWithReifiedTypeParametersLowering: DeclarationTransformer {
+
     override fun transformFlat(declaration: IrDeclaration): List<IrDeclaration>? {
+
         if (declaration is IrFunction && declaration.isInline && declaration.typeParameters.any { it.isReified }) {
             return emptyList()
         }
@@ -23,7 +25,7 @@ class RemoveInlineFunctionsWithReifiedTypeParametersLowering : DeclarationTransf
     }
 }
 
-class CopyInlineFunctionBodyLowering(val context: JsIrBackendContext) : DeclarationTransformer() {
+class CopyInlineFunctionBodyLowering(val context: JsIrBackendContext) : DeclarationTransformer {
     override fun transformFlat(declaration: IrDeclaration): List<IrDeclaration>? {
         if (declaration is IrFunction && declaration.isInline) {
             declaration.body?.let { originalBody ->
