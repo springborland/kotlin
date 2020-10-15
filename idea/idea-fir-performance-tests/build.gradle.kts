@@ -19,6 +19,7 @@ dependencies {
     testCompile(toolsJar())
     testCompile(projectTests(":idea"))
     testCompile(projectTests(":idea:idea-fir"))
+    testCompile(project(":idea:idea-frontend-fir:idea-fir-low-level-api"))
     compile(project(":idea:idea-fir"))
     testCompile(projectTests(":compiler:tests-common"))
     testCompile(projectTests(":idea:idea-test-framework"))

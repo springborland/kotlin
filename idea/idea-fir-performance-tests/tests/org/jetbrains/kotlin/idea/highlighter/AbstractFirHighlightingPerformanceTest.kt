@@ -15,11 +15,14 @@ import com.intellij.testFramework.RunAll
 import com.intellij.testFramework.fixtures.impl.CodeInsightTestFixtureImpl
 import com.intellij.util.ThrowableRunnable
 import org.jetbrains.kotlin.idea.KotlinFileType
+import org.jetbrains.kotlin.idea.caches.project.getModuleInfo
+import org.jetbrains.kotlin.idea.fir.low.level.api.cleanResoleStateCaches
 import org.jetbrains.kotlin.idea.perf.Stats
 import org.jetbrains.kotlin.idea.perf.TestData
 import org.jetbrains.kotlin.idea.perf.performanceTest
 import org.jetbrains.kotlin.idea.perf.util.removeInfoMarkers
 import org.jetbrains.kotlin.idea.testFramework.commitAllDocuments
+import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.test.InTextDirectivesUtils
 import java.io.File
 
@@ -76,6 +79,7 @@ abstract class AbstractFirHighlightingPerformanceTest : AbstractHighlightingTest
 
             // to load AST for changed files before it's prohibited by "fileTreeAccessFilter"
             CodeInsightTestFixtureImpl.ensureIndexesUpToDate(project)
+            cleanResoleStateCaches((file as KtFile).getModuleInfo())
         }
     }
 

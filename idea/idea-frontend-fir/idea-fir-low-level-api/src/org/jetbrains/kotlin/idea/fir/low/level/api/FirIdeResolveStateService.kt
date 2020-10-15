@@ -33,9 +33,13 @@ internal class FirIdeResolveStateService(project: Project) {
         ConcurrentHashMap<IdeaModuleInfo, FirModuleResolveStateImpl>()
     }
 
-
     fun getResolveState(moduleInfo: IdeaModuleInfo): FirModuleResolveStateImpl =
         stateCache.computeIfAbsent(moduleInfo) { createResolveStateFor(moduleInfo, sessionProviderStorage) }
+
+    @TestOnly
+    fun clean() {
+        stateCache.clear()
+    }
 
     companion object {
         fun getInstance(project: Project): FirIdeResolveStateService = project.service()
@@ -62,4 +66,11 @@ fun createResolveStateForNoCaching(
     moduleInfo: IdeaModuleInfo,
 ): FirModuleResolveState = FirIdeResolveStateService.createResolveStateFor(moduleInfo, FirIdeSessionProviderStorage(moduleInfo.project!!))
 
+
+@TestOnly
+fun cleanResoleStateCaches(
+    moduleInfo: IdeaModuleInfo,
+) {
+    FirIdeResolveStateService.getInstance(moduleInfo.project!!).clean()
+}
 
