@@ -198,6 +198,7 @@ class Stats(
             val t = statInfo[ERROR_KEY] as? Throwable
             if (t != null) {
                 TeamCity.test(n, errors = listOf(t)) {}
+                //logMessage { "metricChildren.add(Metric('$attemptString', value = null, hasError = true))" }
                 metricChildren.add(Metric(attemptString, value = null, hasError = true))
             } else if (!printOnlyErrors) {
                 val durationMs = (statInfo[TEST_KEY] as Long).nsToMs
@@ -358,6 +359,7 @@ class Stats(
     }
 
     fun flush() {
+
         val children = metrics.toMutableList()
 
         val properties = mutableMapOf<String, Any>()
@@ -393,6 +395,15 @@ class Stats(
 
         val metric = Metric(name, null, children = children, properties = properties)
 
+        fun Metric.ifHasError(): Boolean {
+            if (hasError) return true
+
+            return this.children.any { it.ifHasError() }
+        }
+        logMessage { "write $name" }
+        if (metric.ifHasError()) {
+            logMessage { "writeJson: $metric" }
+        }
         metric.writeJson()
         metrics.writeCSV(name, header)
     }
