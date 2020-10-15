@@ -8,9 +8,9 @@ package org.jetbrains.kotlin.backend.common.lower
 import org.jetbrains.kotlin.backend.common.*
 import org.jetbrains.kotlin.backend.common.descriptors.synthesizedString
 import org.jetbrains.kotlin.backend.common.ir.*
+import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
 import org.jetbrains.kotlin.descriptors.DescriptorVisibility
-import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.ir.ObsoleteDescriptorBasedAPI
 import org.jetbrains.kotlin.ir.UNDEFINED_OFFSET
 import org.jetbrains.kotlin.ir.builders.*
@@ -41,7 +41,10 @@ open class DefaultArgumentStubGenerator(
     private val skipExternalMethods: Boolean = false,
     private val forceSetOverrideSymbols: Boolean = true
 ) : DeclarationTransformer() {
-    override val withLocalDeclarations: Boolean get() = true
+
+    override fun lower(irFile: IrFile) {
+        runPostfix(true).toFileLoweringPass().lower(irFile)
+    }
 
     override fun transformFlat(declaration: IrDeclaration): List<IrDeclaration>? {
         if (declaration is IrFunction) {
@@ -445,7 +448,9 @@ class DefaultParameterCleaner(
     val context: CommonBackendContext,
     val replaceDefaultValuesWithStubs: Boolean = false
 ) : DeclarationTransformer() {
-    override val withLocalDeclarations: Boolean get() = true
+    override fun lower(irFile: IrFile) {
+        runPostfix(true).toFileLoweringPass().lower(irFile)
+    }
 
     override fun transformFlat(declaration: IrDeclaration): List<IrDeclaration>? {
         if (declaration is IrValueParameter && declaration.defaultValue != null) {

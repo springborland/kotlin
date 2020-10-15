@@ -5,10 +5,7 @@
 
 package org.jetbrains.kotlin.backend.common.lower
 
-import org.jetbrains.kotlin.backend.common.BodyLoweringPass
-import org.jetbrains.kotlin.backend.common.CommonBackendContext
-import org.jetbrains.kotlin.backend.common.DeclarationTransformer
-import org.jetbrains.kotlin.backend.common.runOnFilePostfix
+import org.jetbrains.kotlin.backend.common.*
 import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.IrStatement
 import org.jetbrains.kotlin.ir.declarations.*
@@ -91,7 +88,10 @@ class InitializersCleanupLowering(
     val context: CommonBackendContext,
     private val shouldEraseFieldInitializer: (IrField) -> Boolean = { it.correspondingPropertySymbol?.owner?.isConst != true }
 ) : DeclarationTransformer() {
-    override val withLocalDeclarations: Boolean get() = true
+
+    override fun lower(irFile: IrFile) {
+        runPostfix(withLocalDeclarations = true).toFileLoweringPass().lower(irFile)
+    }
 
     override fun transformFlat(declaration: IrDeclaration): List<IrDeclaration>? {
         if (declaration is IrAnonymousInitializer) return emptyList()

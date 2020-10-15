@@ -5,8 +5,7 @@
 
 package org.jetbrains.kotlin.backend.common.lower
 
-import org.jetbrains.kotlin.backend.common.BodyLoweringPass
-import org.jetbrains.kotlin.backend.common.DeclarationTransformer
+import org.jetbrains.kotlin.backend.common.*
 import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.IrStatement
 import org.jetbrains.kotlin.ir.declarations.*
@@ -16,7 +15,9 @@ import org.jetbrains.kotlin.ir.util.isEffectivelyExternal
 import org.jetbrains.kotlin.ir.visitors.*
 
 class PropertiesLowering : DeclarationTransformer() {
-    override val withLocalDeclarations: Boolean get() = true
+    override fun lower(irFile: IrFile) {
+        runPostfix(true).toFileLoweringPass().lower(irFile)
+    }
 
     override fun transformFlat(declaration: IrDeclaration): List<IrDeclaration>? {
         when (declaration) {
