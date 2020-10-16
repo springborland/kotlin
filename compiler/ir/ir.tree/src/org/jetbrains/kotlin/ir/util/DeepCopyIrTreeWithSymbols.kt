@@ -563,7 +563,7 @@ open class DeepCopyIrTreeWithSymbols(
 
     override fun visitEnumConstructorCall(expression: IrEnumConstructorCall): IrEnumConstructorCall {
         val newConstructor = symbolRemapper.getReferencedConstructor(expression.symbol)
-        return IrEnumConstructorCallImpl(
+        return IrEnumConstructorCallImpl.fromSymbolOwner(
             expression.startOffset, expression.endOffset,
             expression.type.remapType(),
             newConstructor,
