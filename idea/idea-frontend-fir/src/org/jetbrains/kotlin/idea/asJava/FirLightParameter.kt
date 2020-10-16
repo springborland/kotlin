@@ -15,9 +15,11 @@ import org.jetbrains.kotlin.asJava.elements.*
 import org.jetbrains.kotlin.codegen.AsmUtil
 import org.jetbrains.kotlin.descriptors.annotations.AnnotationUseSiteTarget
 import org.jetbrains.kotlin.fir.declarations.*
-import org.jetbrains.kotlin.fir.psi
-import org.jetbrains.kotlin.fir.types.*
-import org.jetbrains.kotlin.load.kotlin.TypeMappingMode
+import org.jetbrains.kotlin.idea.frontend.api.symbols.*
+import org.jetbrains.kotlin.idea.frontend.api.symbols.markers.KtAnnotatedSymbol
+import org.jetbrains.kotlin.idea.frontend.api.symbols.markers.KtNamedSymbol
+import org.jetbrains.kotlin.idea.frontend.api.symbols.markers.KtPossibleExtensionSymbol
+import org.jetbrains.kotlin.idea.frontend.api.types.KtType
 import org.jetbrains.kotlin.psi.KtParameter
 
 internal abstract class FirLightParameter(containingDeclaration: FirLightMethod) : PsiVariable, NavigationItem,
@@ -82,19 +84,11 @@ internal abstract class FirLightParameter(containingDeclaration: FirLightMethod)
 
 
 internal class FirLightParameterForFirNode(
-    parameter: FirValueParameter,
+    parameter: KtParameterSymbol,
     method: FirLightMethod
 ) : FirLightParameter(method) {
-    // This is greedy realization of UL class.
-    // This means that all data that depends on descriptor evaluated in ctor so the descriptor will be released on the end.
-    // Be aware to save descriptor in class instance or any depending references
-
     private val _name: String = parameter.name.asString()
     override fun getName(): String = _name
-
-    private val lazyInitializers = mutableListOf<Lazy<*>>()
-    private inline fun <T> getAndAddLazy(crossinline initializer: () -> T): Lazy<T> =
-        lazyPub { initializer() }.also { lazyInitializers.add(it) }
 
     private val _isVarArgs: Boolean = parameter.isVararg
     override fun isVarArgs() = _isVarArgs
@@ -103,49 +97,49 @@ internal class FirLightParameterForFirNode(
 
     override val kotlinOrigin: KtParameter? = parameter.psi as? KtParameter
 
-    private val _annotations: List<PsiAnnotation> by getAndAddLazy {
-        parameter.computeAnnotations(this, parameter.returnTypeRef.nullabilityForJava)
+    private val _annotations: List<PsiAnnotation> by lazyPub {
+        parameter.computeAnnotations(this, parameter.type.nullabilityType)
     }
 
     override fun getModifierList(): PsiModifierList = _modifierList
-    private val _modifierList: PsiModifierList by getAndAddLazy {
+    private val _modifierList: PsiModifierList by lazyPub {
         FirLightClassModifierList(this, emptySet(), _annotations)
     }
 
-    private val _type by getAndAddLazy {
-        parameter.returnTypeRef.asPsiType(parameter.session, TypeMappingMode.DEFAULT, this)
+    private val _type by lazyPub {
+        parameter.asPsiType(this, FirResolvePhase.TYPES)
     }
 
     override fun getType(): PsiType = _type
-
-    init {
-        //We should force computations on all lazy delegates to release descriptor on the end of ctor call
-        with(lazyInitializers) {
-            forEach { it.value }
-            clear()
-        }
-    }
 }
 
-
 internal class FirLightParameterForReceiver private constructor(
-    firFunction: FirFunction<*>,
-    firTypeRef: FirTypeRef,
+    firFunction: KtAnnotatedSymbol,
+    type: KtType,
     methodName: String,
     method: FirLightMethod
 ) : FirLightParameter(method) {
 
     companion object {
-        fun tryGet(firFunction: FirFunction<*>, method: FirLightMethod): FirLightParameterForReceiver? =
-            firFunction.receiverTypeRef?.let { type ->
+        fun tryGet(
+            callableSymbol: KtFunctionLikeSymbol,
+            method: FirLightMethod
+        ): FirLightParameterForReceiver? {
 
-                val functionName = (firFunction as? FirSimpleFunction)?.name?.asString()
-                    ?: (firFunction as? FirProperty)?.name?.asString()
+            if (callableSymbol !is KtNamedSymbol) return null
+            if (callableSymbol !is KtAnnotatedSymbol) return null
+            if (callableSymbol !is KtPossibleExtensionSymbol) return null
 
-                functionName?.let { name ->
-                    FirLightParameterForReceiver(firFunction, type, name, method)
-                }
-            }
+            if (!callableSymbol.isExtension) return null
+            val receiverType = callableSymbol.receiverType ?: return null
+
+            return FirLightParameterForReceiver(
+                firFunction = callableSymbol,
+                type = receiverType,
+                methodName = callableSymbol.name.asString(),
+                method = method
+            )
+        }
     }
 
     private val _name: String by lazyPub {
@@ -154,35 +148,23 @@ internal class FirLightParameterForReceiver private constructor(
 
     override fun getName(): String = _name
 
-    private val lazyInitializers = mutableListOf<Lazy<*>>()
-    private inline fun <T> getAndAddLazy(crossinline initializer: () -> T): Lazy<T> =
-        lazyPub { initializer() }.also { lazyInitializers.add(it) }
-
     override fun isVarArgs() = false
     override fun hasModifierProperty(name: String): Boolean = false //TODO()
 
     override val kotlinOrigin: KtParameter? = null
 
-    private val _annotations: List<PsiAnnotation> by getAndAddLazy {
-        firFunction.computeAnnotations(this, firTypeRef.nullabilityForJava, AnnotationUseSiteTarget.RECEIVER)
+    private val _annotations: List<PsiAnnotation> by lazyPub {
+        firFunction.computeAnnotations(this, type.nullabilityType, AnnotationUseSiteTarget.RECEIVER)
     }
 
     override fun getModifierList(): PsiModifierList = _modifierList
-    private val _modifierList: PsiModifierList by getAndAddLazy {
+    private val _modifierList: PsiModifierList by lazyPub {
         FirLightClassModifierList(this, emptySet(), _annotations)
     }
 
-    private val _type by getAndAddLazy {
-        firTypeRef.asPsiType(firFunction.session, TypeMappingMode.DEFAULT, this)
+    private val _type: PsiType by lazyPub {
+        type.asPsiType(firFunction, method, FirResolvePhase.TYPES)
     }
 
     override fun getType(): PsiType = _type
-
-    init {
-        //We should force computations on all lazy delegates to release descriptor on the end of ctor call
-        with(lazyInitializers) {
-            forEach { it.value }
-            clear()
-        }
-    }
 }

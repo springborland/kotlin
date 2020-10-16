@@ -17,9 +17,25 @@ import org.jetbrains.kotlin.asJava.classes.*
 import org.jetbrains.kotlin.asJava.elements.*
 import org.jetbrains.kotlin.descriptors.annotations.AnnotationUseSiteTarget
 import org.jetbrains.kotlin.fir.declarations.*
+import org.jetbrains.kotlin.fir.expressions.FirCall
 import org.jetbrains.kotlin.fir.psi
 import org.jetbrains.kotlin.fir.resolve.calls.isUnit
+import org.jetbrains.kotlin.fir.symbols.impl.FirConstructorSymbol
 import org.jetbrains.kotlin.fir.types.ConeNullability
+import org.jetbrains.kotlin.fir.types.isUnit
+import org.jetbrains.kotlin.idea.frontend.api.fir.symbols.KtFirFunctionSymbol
+import org.jetbrains.kotlin.idea.frontend.api.fir.symbols.KtFirPropertyGetterSymbol
+import org.jetbrains.kotlin.idea.frontend.api.fir.symbols.KtFirPropertySetterSymbol
+import org.jetbrains.kotlin.idea.frontend.api.fir.symbols.KtFirSymbol
+import org.jetbrains.kotlin.idea.frontend.api.fir.types.KtFirType
+import org.jetbrains.kotlin.idea.frontend.api.symbols.*
+import org.jetbrains.kotlin.idea.frontend.api.symbols.markers.KtAnnotatedSymbol
+import org.jetbrains.kotlin.idea.frontend.api.symbols.markers.KtNamedSymbol
+import org.jetbrains.kotlin.idea.frontend.api.symbols.markers.KtPossibleExtensionSymbol
+import org.jetbrains.kotlin.idea.frontend.api.symbols.markers.KtTypedSymbol
+import org.jetbrains.kotlin.idea.frontend.api.types.KtTypeNullability
+import org.jetbrains.kotlin.idea.frontend.api.types.KtTypeWithNullability
+import org.jetbrains.kotlin.idea.frontend.api.types.isUnit
 import org.jetbrains.kotlin.load.kotlin.TypeMappingMode
 import org.jetbrains.kotlin.psi.KtDeclaration
 import org.jetbrains.kotlin.psi.KtNamedDeclaration
@@ -70,6 +86,10 @@ internal abstract class FirLightMethod(
     private val methodIndex: Int
 ) : FirLightMemberImpl<PsiMethod>(lightMemberOrigin, containingClass), KtLightMethod {
 
+    override fun getBody(): PsiCodeBlock? = null
+
+    override fun getReturnTypeElement(): PsiTypeElement? = null
+
     abstract fun buildTypeParameterList(): PsiTypeParameterList
 
     override fun setName(p0: String): PsiElement = cannotModify()
@@ -118,23 +138,23 @@ internal abstract class FirLightMethod(
 }
 
 internal class FirLightAccessorMethodForFirNode(
-    firPropertyAccessor: FirPropertyAccessor,
-    firContainingProperty: FirProperty,
+    firPropertyAccessor: KtPropertyAccessorSymbol,
+    firContainingProperty: KtPropertySymbol,
     lightMemberOrigin: LightMemberOrigin?,
     containingClass: FirLightClassBase,
     isTopLevel: Boolean
-) : FirLightNotConstructorMethodForFirNode(
+) : FirLightMethodForFirNode(
     firPropertyAccessor,
     lightMemberOrigin,
     containingClass,
-    if (firPropertyAccessor.isGetter) METHOD_INDEX_FOR_GETTER else METHOD_INDEX_FOR_SETTER
+    if (firPropertyAccessor is KtPropertyGetterSymbol) METHOD_INDEX_FOR_GETTER else METHOD_INDEX_FOR_SETTER
 ) {
-    private fun String.abiName(propertyAccessor: FirPropertyAccessor) =
-        if (propertyAccessor.isGetter) getterName(this)
+    private fun String.abiName(firPropertyAccessor: KtPropertyAccessorSymbol) =
+        if (firPropertyAccessor is KtPropertyGetterSymbol) getterName(this)
         else setterName(this)
 
     //TODO add JvmName
-    private val _name: String by getAndAddLazy {
+    private val _name: String by lazyPub {
         firContainingProperty.name.identifier
             .abiName(firPropertyAccessor)
     }
@@ -146,14 +166,14 @@ internal class FirLightAccessorMethodForFirNode(
     override val kotlinOrigin: KtDeclaration? =
         (firPropertyAccessor.psi ?: firContainingProperty.psi) as? KtDeclaration
 
-    private val _annotations: List<PsiAnnotation> by getAndAddLazy {
+    private val _annotations: List<PsiAnnotation> by lazyPub {
         val accessorSite =
-            if (firPropertyAccessor.isGetter) AnnotationUseSiteTarget.PROPERTY_GETTER
+            if (firPropertyAccessor is KtPropertyGetterSymbol) AnnotationUseSiteTarget.PROPERTY_GETTER
             else AnnotationUseSiteTarget.PROPERTY_SETTER
-        firContainingProperty.computeAnnotations(this, ConeNullability.UNKNOWN, accessorSite)
+        firContainingProperty.computeAnnotations(this, NullabilityType.Unknown, accessorSite)
     }
 
-    private val _modifiers: Set<String> by getAndAddLazy {
+    private val _modifiers: Set<String> by lazyPub {
 
         val modifiers = firPropertyAccessor.computeModalityForMethod(isTopLevel) +
                 firPropertyAccessor.computeVisibility(isTopLevel)
@@ -161,26 +181,35 @@ internal class FirLightAccessorMethodForFirNode(
         val isJvmStatic =
             _annotations.any { it.qualifiedName == "kotlin.jvm.JvmStatic" }
 
-        if (isJvmStatic) return@getAndAddLazy modifiers + PsiModifier.STATIC
+        if (isJvmStatic) return@lazyPub modifiers + PsiModifier.STATIC
 
         modifiers
     }
 
-    private val _modifierList: PsiModifierList by getAndAddLazy {
+    private val _modifierList: PsiModifierList by lazyPub {
         FirLightClassModifierList(this, _modifiers, _annotations)
     }
 
     override fun getModifierList(): PsiModifierList = _modifierList
+
+    override fun isConstructor(): Boolean = false
+
+    private val _returnedType: PsiType? by lazyPub {
+        if (firPropertyAccessor is KtPropertySetterSymbol) return@lazyPub PsiType.VOID
+        return@lazyPub firPropertyAccessor.asPsiType(this@FirLightAccessorMethodForFirNode)
+    }
+
+    override fun getReturnType(): PsiType? = _returnedType
 }
 
 internal class FirLightSimpleMethodForFirNode(
-    firFunction: FirSimpleFunction,
+    firFunction: KtFunctionSymbol,
     lightMemberOrigin: LightMemberOrigin?,
     containingClass: FirLightClassBase,
     methodIndex: Int,
     isTopLevel: Boolean,
     argumentsSkipMask: BitSet? = null
-) : FirLightNotConstructorMethodForFirNode(
+) : FirLightMethodForFirNode(
     firFunction = firFunction,
     lightMemberOrigin = lightMemberOrigin,
     containingClass = containingClass,
@@ -188,23 +217,22 @@ internal class FirLightSimpleMethodForFirNode(
     argumentsSkipMask = argumentsSkipMask
 ) {
 
-    private val _name: String by getAndAddLazy {
+    private val _name: String by lazyPub {
         firFunction.name.asString()
     }
 
     override fun getName(): String = _name
 
-
-    private val _annotations: List<PsiAnnotation> by getAndAddLazy {
-        firFunction.computeAnnotations(this, firFunction.returnTypeRef.nullabilityForJava)
+    private val _annotations: List<PsiAnnotation> by lazyPub {
+        firFunction.computeAnnotations(this, firFunction.type.nullabilityType)
     }
 
-    private val _modifiers: Set<String> by getAndAddLazy {
+    private val _modifiers: Set<String> by lazyPub {
 
         val isInlineOnly =
             _annotations.any { it.qualifiedName == "kotlin.internal.InlineOnly" }
 
-        if (isInlineOnly) return@getAndAddLazy setOf(PsiModifier.FINAL, PsiModifier.PRIVATE)
+        if (isInlineOnly) return@lazyPub setOf(PsiModifier.FINAL, PsiModifier.PRIVATE)
 
         val modifiers = firFunction.computeModalityForMethod(isTopLevel = isTopLevel) +
                 firFunction.computeVisibility(isTopLevel = isTopLevel)
@@ -212,21 +240,29 @@ internal class FirLightSimpleMethodForFirNode(
         val isJvmStatic =
             _annotations.any { it.qualifiedName == "kotlin.jvm.JvmStatic" }
 
-        if (isJvmStatic) return@getAndAddLazy modifiers + PsiModifier.STATIC
+        if (isJvmStatic) return@lazyPub modifiers + PsiModifier.STATIC
 
         modifiers
     }
 
 
-    private val _modifierList: PsiModifierList by getAndAddLazy {
+    private val _modifierList: PsiModifierList by lazyPub {
         FirLightClassModifierList(this, _modifiers, _annotations)
     }
 
     override fun getModifierList(): PsiModifierList = _modifierList
+
+    override fun isConstructor(): Boolean = false
+
+    private val _returnedType: PsiType? by lazyPub {
+        firFunction.asPsiType(this@FirLightSimpleMethodForFirNode)
+    }
+
+    override fun getReturnType(): PsiType? = _returnedType
 }
 
 internal class FirLightConstructorForFirNode(
-    firFunction: FirConstructor,
+    firFunction: KtConstructorSymbol,
     lightMemberOrigin: LightMemberOrigin?,
     containingClass: FirLightClassBase,
     methodIndex: Int,
@@ -238,15 +274,15 @@ internal class FirLightConstructorForFirNode(
 
     override fun isConstructor(): Boolean = true
 
-    private val _annotations: List<PsiAnnotation> by getAndAddLazy {
-        firFunction.computeAnnotations(this, ConeNullability.UNKNOWN)
+    private val _annotations: List<PsiAnnotation> by lazyPub {
+        firFunction.computeAnnotations(this, NullabilityType.Unknown)
     }
 
-    private val _modifiers: Set<String> by getAndAddLazy {
+    private val _modifiers: Set<String> by lazyPub {
         setOf(firFunction.computeVisibility(isTopLevel = false))
     }
 
-    private val _modifierList: PsiModifierList by getAndAddLazy {
+    private val _modifierList: PsiModifierList by lazyPub {
         FirLightClassModifierList(this, _modifiers, _annotations)
     }
 
@@ -255,38 +291,8 @@ internal class FirLightConstructorForFirNode(
     override fun getReturnType(): PsiType? = null
 }
 
-internal abstract class FirLightNotConstructorMethodForFirNode(
-    firFunction: FirFunction<*>,
-    lightMemberOrigin: LightMemberOrigin?,
-    containingClass: FirLightClassBase,
-    methodIndex: Int,
-    argumentsSkipMask: BitSet? = null
-) : FirLightMethodForFirNode(
-    firFunction = firFunction,
-    lightMemberOrigin = lightMemberOrigin,
-    containingClass = containingClass,
-    methodIndex = methodIndex,
-    argumentsSkipMask = argumentsSkipMask
-) {
-
-    init {
-        require(firFunction !is FirConstructor)
-    }
-
-    override fun isConstructor(): Boolean = false
-
-    private val _returnedType: PsiType? by getAndAddLazy {
-        firFunction.returnTypeRef.coneTypeSafe?.run {
-            if (isUnit) PsiType.VOID
-            else asPsiType(firFunction.session, TypeMappingMode.DEFAULT, this@FirLightNotConstructorMethodForFirNode)
-        }
-    }
-
-    override fun getReturnType(): PsiType? = _returnedType
-}
-
 internal abstract class FirLightMethodForFirNode(
-    firFunction: FirFunction<*>,
+    firFunction: KtFunctionLikeSymbol,
     lightMemberOrigin: LightMemberOrigin?,
     containingClass: FirLightClassBase,
     methodIndex: Int,
@@ -296,10 +302,6 @@ internal abstract class FirLightMethodForFirNode(
     containingClass,
     methodIndex
 ) {
-    // This is greedy realization of UL class.
-    // This means that all data that depends on descriptor evaluated in ctor so the descriptor will be released on the end.
-    // Be aware to save descriptor in class instance or any depending references
-
     override val isMangled: Boolean = false
 
     private var _isVarArgs: Boolean = firFunction.valueParameters.any { it.isVararg }
@@ -312,36 +314,17 @@ internal abstract class FirLightMethodForFirNode(
 
     override fun getTypeParameterList(): PsiTypeParameterList? = null //TODO
 
-    private val parameterListBuilder = LightParameterListBuilder(manager, language)
-    override fun getParameterList(): PsiParameterList = parameterListBuilder
-
-    override fun getBody(): PsiCodeBlock? = null
-    override fun getReturnTypeElement(): PsiTypeElement? = null
-
-    override val kotlinOrigin: KtDeclaration? = firFunction.psi as? KtDeclaration
-
-    private val lazyInitializers = mutableListOf<Lazy<*>>()
-    protected inline fun <T> getAndAddLazy(crossinline initializer: () -> T): Lazy<T> =
-        lazyPub { initializer() }.also { lazyInitializers.add(it) }
-
-    override fun buildTypeParameterList(): PsiTypeParameterList =
-        KotlinLightTypeParameterListBuilder(this) //TODO()
-
-    override fun getThrowsList(): PsiReferenceList =
-        KotlinLightReferenceListBuilder(manager, language, PsiReferenceList.Role.THROWS_LIST) //TODO()
-
-    override fun getDefaultValue(): PsiAnnotationMemberValue? = null //TODO()
-
-    init {
+    private val _parametersList by lazyPub {
+        val builder = LightParameterListBuilder(manager, language)
 
         FirLightParameterForReceiver.tryGet(firFunction, this)?.let {
-            parameterListBuilder.addParameter(it)
+            builder.addParameter(it)
         }
 
         firFunction.valueParameters.mapIndexed { index, parameter ->
             val needToSkip = argumentsSkipMask?.get(index) == true
             if (!needToSkip) {
-                parameterListBuilder.addParameter(
+                builder.addParameter(
                     FirLightParameterForFirNode(
                         parameter = parameter,
                         method = this@FirLightMethodForFirNode
@@ -350,19 +333,18 @@ internal abstract class FirLightMethodForFirNode(
             }
         }
 
-//        methodDescriptor.extensionReceiverParameter?.let { receiver ->
-//            //delegate.addParameter(KtUltraLightParameterForDescriptor(receiver, support, this))
-//        }
-
-//        for (valueParameter in methodDescriptor.valueParameters) {
-        //delegate.addParameter(KtUltraLightParameterForDescriptor(valueParameter, support, this))
-//        }
-
-
-        //We should force computations on all lazy delegates to release descriptor on the end of ctor call
-        with(lazyInitializers) {
-            forEach { it.value }
-            clear()
-        }
+        builder
     }
+
+    override fun getParameterList(): PsiParameterList = _parametersList
+
+    override val kotlinOrigin: KtDeclaration? = firFunction.psi as? KtDeclaration
+
+    override fun buildTypeParameterList(): PsiTypeParameterList =
+        KotlinLightTypeParameterListBuilder(this) //TODO()
+
+    override fun getThrowsList(): PsiReferenceList =
+        KotlinLightReferenceListBuilder(manager, language, PsiReferenceList.Role.THROWS_LIST) //TODO()
+
+    override fun getDefaultValue(): PsiAnnotationMemberValue? = null //TODO()
 }

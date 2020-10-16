@@ -38,6 +38,12 @@ import org.jetbrains.kotlin.asJava.elements.KtLightMethod
 import org.jetbrains.kotlin.descriptors.annotations.AnnotationUseSiteTarget
 import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.idea.KotlinLanguage
+import org.jetbrains.kotlin.idea.frontend.api.fir.symbols.KtFirPropertySymbol
+import org.jetbrains.kotlin.idea.frontend.api.symbols.KtCallableSymbol
+import org.jetbrains.kotlin.idea.frontend.api.symbols.KtConstructorSymbol
+import org.jetbrains.kotlin.idea.frontend.api.symbols.KtFunctionSymbol
+import org.jetbrains.kotlin.idea.frontend.api.symbols.KtPropertySymbol
+import org.jetbrains.kotlin.idea.frontend.api.symbols.markers.KtAnnotatedSymbol
 import java.util.*
 
 abstract class FirLightClassBase protected constructor(manager: PsiManager) : LightElement(manager, KotlinLanguage.INSTANCE), PsiClass,
@@ -144,15 +150,15 @@ abstract class FirLightClassBase protected constructor(manager: PsiManager) : Li
         }
     }
 
-    protected fun createMethods(declarations: List<FirDeclaration>, isTopLevel: Boolean, result: MutableList<KtLightMethod>) {
+    protected fun createMethods(declarations: Sequence<KtCallableSymbol>, isTopLevel: Boolean, result: MutableList<KtLightMethod>) {
         //TODO isHiddenByDeprecation
         var methodIndex = METHOD_INDEX_BASE
         for (declaration in declarations) {
 
-            if (declaration is FirFunction<*> && declaration.hasAnnotation("kotlin.jvm.JvmSynthetic")) continue
+            if (declaration is KtAnnotatedSymbol && declaration.hasAnnotation("kotlin.jvm.JvmSynthetic")) continue
 
             when (declaration) {
-                is FirSimpleFunction -> {
+                is KtFunctionSymbol -> {
                     result.add(
                         FirLightSimpleMethodForFirNode(
                             firFunction = declaration,
@@ -168,7 +174,7 @@ abstract class FirLightClassBase protected constructor(manager: PsiManager) : Li
 
                         for (i in declaration.valueParameters.size - 1 downTo 0) {
 
-                            if (declaration.valueParameters[i].defaultValue == null) continue
+                            if (!declaration.valueParameters[i].hasDefaultValue) continue
 
                             skipMask.set(i)
 
@@ -185,7 +191,7 @@ abstract class FirLightClassBase protected constructor(manager: PsiManager) : Li
                         }
                     }
                 }
-                is FirConstructor -> {
+                is KtConstructorSymbol -> {
                     result.add(
                         FirLightConstructorForFirNode(
                             firFunction = declaration,
@@ -195,7 +201,7 @@ abstract class FirLightClassBase protected constructor(manager: PsiManager) : Li
                         )
                     )
                 }
-                is FirProperty -> {
+                is KtPropertySymbol -> {
 
                     if (declaration.hasAnnotation("kotlin.jvm.JvmField")) continue
 
@@ -235,11 +241,16 @@ abstract class FirLightClassBase protected constructor(manager: PsiManager) : Li
         }
     }
 
-    protected fun createFields(declarations: List<FirDeclaration>, isTopLevel: Boolean, result: MutableList<KtLightField>) {
+    protected fun createFields(declarations: Sequence<KtCallableSymbol>, isTopLevel: Boolean, result: MutableList<KtLightField>) {
         //TODO isHiddenByDeprecation
         for (declaration in declarations) {
-            if (declaration !is FirProperty) continue
-            if (!declaration.hasBackingField) continue
+            if (declaration !is KtPropertySymbol) continue
+
+            //Does we need to push it to hight lvl api?
+            if (declaration !is KtFirPropertySymbol) continue
+            val hasBackingField = declaration.firRef.withFir(FirResolvePhase.RAW_FIR) { it.hasBackingField }
+
+            if (!hasBackingField) continue
             if (declaration.hasAnnotation("kotlin.jvm.JvmSynthetic")) continue
             result.add(
                 FirLightFieldForFirPropertyNode(

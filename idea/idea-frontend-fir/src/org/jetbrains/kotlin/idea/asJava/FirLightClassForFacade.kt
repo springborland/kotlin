@@ -21,9 +21,12 @@ import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.types.ConeNullability
 import org.jetbrains.kotlin.idea.KotlinLanguage
 import org.jetbrains.kotlin.idea.fir.low.level.api.api.LowLevelFirApiFacade
+import org.jetbrains.kotlin.idea.frontend.api.analyze
+import org.jetbrains.kotlin.idea.frontend.api.symbols.KtCallableSymbol
 import org.jetbrains.kotlin.load.java.structure.LightClassOriginKind
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.psi.*
+import org.jetbrains.kotlin.psi.psiUtil.isPrivate
 import org.jetbrains.kotlin.util.collectionUtils.filterIsInstanceAnd
 import javax.swing.Icon
 
@@ -50,15 +53,16 @@ class FirLightClassForFacade(
 
         val modifiers = setOf(PsiModifier.PUBLIC, PsiModifier.FINAL)
 
-        val annotations = files.flatMap { file ->
-            file.withFir<FirFile, List<PsiAnnotation>> {
-                computeAnnotations(
-                    parent = this@FirLightClassForFacade,
-                    nullability = ConeNullability.UNKNOWN,
-                    annotationUseSiteTarget = AnnotationUseSiteTarget.FILE
-                )
-            }
-        }
+//        val annotations = files.flatMap { file ->
+//            file.withFir<FirFile, List<PsiAnnotation>> {
+//                computeAnnotations(
+//                    parent = this@FirLightClassForFacade,
+//                    nullability = ConeNullability.UNKNOWN,
+//                    annotationUseSiteTarget = AnnotationUseSiteTarget.FILE
+//                )
+//            }
+//        }
+        val annotations = emptyList<PsiAnnotation>() //TODO
 
         FirLightClassModifierList(this@FirLightClassForFacade, modifiers, annotations)
     }
@@ -79,9 +83,20 @@ class FirLightClassForFacade(
         file: KtFile,
         result: MutableList<KtLightMethod>
     ) {
-        file.withFir<FirFile, Unit> {
-            createMethods(declarations, isTopLevel = true, result)
+        //it.isHiddenByDeprecation(support)
+        val declarations = file.declarations
+            .filterIsInstance<KtNamedDeclaration>()
+            .filterNot { multiFileClass && it.isPrivate() }
+
+        if (declarations.isEmpty()) return
+
+        val symbols = analyze(file) {
+            declarations.mapNotNull {
+                it.getSymbol() as? KtCallableSymbol
+            }
         }
+
+        createMethods(symbols.asSequence(), isTopLevel = true, result)
     }
 
     private val _ownMethods: List<KtLightMethod> by lazyPub {
@@ -89,27 +104,37 @@ class FirLightClassForFacade(
         for (file in files) {
             loadMethodsFromFile(file, result)
         }
-        if (!multiFileClass) result else result.filterNot { it.hasModifierProperty(PsiModifier.PRIVATE) }
+        result
     }
 
     private val multiFileClass: Boolean by lazyPub {
-        files.any {
-            it.withFir<FirFile, Boolean> {
-                this.hasAnnotation(JvmFileClassUtil.JVM_MULTIFILE_CLASS.asString())
-            }
-        }
+        false //TODO
+//        files.any {
+//            it.withFir<FirFile, Boolean> {
+//                this.hasAnnotation(JvmFileClassUtil.JVM_MULTIFILE_CLASS.asString())
+//            }
+//        }
     }
 
     private fun loadFieldsFromFile(
         file: KtFile,
         result: MutableList<KtLightField>
     ) {
-        file.withFir<FirFile, Unit> {
-            val declarationsToProceed =
-                if (multiFileClass) declarations.filter { it is FirProperty && it.isConst } else declarations
 
-            createFields(declarationsToProceed, isTopLevel = true, result)
+        //it.isHiddenByDeprecation(support)
+        val declarations = file.declarations
+            .filterIsInstance<KtNamedDeclaration>()
+            .filterNot { multiFileClass && it is FirProperty && it.isConst }
+
+        if (declarations.isEmpty()) return
+
+        val symbols = analyze(file) {
+            declarations.mapNotNull {
+                it.getSymbol() as? KtCallableSymbol
+            }
         }
+
+        createFields(symbols.asSequence(), isTopLevel = true, result)
     }
 
     private val _ownFields: List<KtLightField> by lazyPub {
@@ -207,7 +232,7 @@ class FirLightClassForFacade(
     override fun getNavigationElement() = firstFileInFacade
 
     override fun isEquivalentTo(another: PsiElement?): Boolean {
-        return another is KtLightClassForFacade && Comparing.equal(another.qualifiedName, qualifiedName)
+        return another is FirLightClassForFacade && Comparing.equal(another.qualifiedName, qualifiedName)
     }
 
     override fun getElementIcon(flags: Int): Icon? = throw UnsupportedOperationException("This should be done by JetIconProvider")

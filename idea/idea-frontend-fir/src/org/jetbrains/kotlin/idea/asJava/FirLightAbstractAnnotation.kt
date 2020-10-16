@@ -9,10 +9,7 @@ import com.intellij.psi.*
 import org.jetbrains.kotlin.asJava.classes.cannotModify
 import org.jetbrains.kotlin.asJava.classes.lazyPub
 import org.jetbrains.kotlin.asJava.elements.*
-import org.jetbrains.kotlin.fir.expressions.FirAnnotationCall
-import org.jetbrains.kotlin.fir.psi
-import org.jetbrains.kotlin.fir.types.classId
-import org.jetbrains.kotlin.fir.types.coneType
+import org.jetbrains.kotlin.idea.frontend.api.symbols.markers.KtAnnotationCall
 import org.jetbrains.kotlin.psi.*
 
 abstract class FirLightAbstractAnnotation(parent: PsiElement) :
@@ -83,16 +80,13 @@ class FirLightSimpleAnnotation(
 }
 
 class FirLightAnnotationForFirNode(
-    firAnnotation: FirAnnotationCall,
+    private val annotationCall: KtAnnotationCall,
     parent: PsiElement,
 ) : FirLightAbstractAnnotation(parent) {
 
-    override val kotlinOrigin: KtCallElement? = firAnnotation.psi as? KtCallElement
+    override val kotlinOrigin: KtCallElement? = annotationCall.psi
 
-    private val _qualifiedName: String? =
-        firAnnotation.annotationTypeRef.coneTypeSafe?.classId?.asSingleFqName()?.asString()
+    override fun getQualifiedName(): String? = annotationCall.classId?.asSingleFqName()?.asString()
 
-    override fun getQualifiedName(): String? = _qualifiedName
-
-    override fun getName(): String? = _qualifiedName
+    override fun getName(): String? = qualifiedName
 }

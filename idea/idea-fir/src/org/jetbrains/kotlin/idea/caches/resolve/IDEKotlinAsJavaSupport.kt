@@ -18,6 +18,7 @@ import org.jetbrains.kotlin.asJava.classes.KtLightClassForFacade
 import org.jetbrains.kotlin.asJava.classes.shouldNotBeVisibleAsLightClass
 import org.jetbrains.kotlin.idea.asJava.FirLightClassForFacade
 import org.jetbrains.kotlin.idea.asJava.FirLightClassForSourceDeclaration
+import org.jetbrains.kotlin.idea.frontend.api.analyze
 import org.jetbrains.kotlin.idea.util.ifFalse
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.psi.KtClassOrObject
@@ -44,7 +45,10 @@ class IDEKotlinAsJavaFirSupport(project: Project) : IDEKotlinAsJavaSupport(proje
             CachedValuesManager.getCachedValue(classOrObject) {
                 CachedValueProvider.Result
                     .create(
-                        FirLightClassForSourceDeclaration(classOrObject),
+                        FirLightClassForSourceDeclaration(
+                            analyze(classOrObject) { classOrObject.getClassOrObjectSymbol() },
+                            classOrObject.manager
+                        ),
                         KotlinModificationTrackerService.getInstance(classOrObject.project).outOfBlockModificationTracker
                     )
             }

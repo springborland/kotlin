@@ -13,7 +13,6 @@ import com.intellij.psi.impl.PsiSuperMethodImplUtil
 import com.intellij.psi.search.SearchScope
 import com.intellij.psi.stubs.IStubElementType
 import com.intellij.psi.stubs.StubElement
-import com.intellij.psi.util.CachedValue
 import com.intellij.psi.util.CachedValueProvider
 import com.intellij.psi.util.CachedValuesManager
 import com.intellij.util.IncorrectOperationException
@@ -24,7 +23,6 @@ import org.jetbrains.kotlin.asJava.elements.KtLightField
 import org.jetbrains.kotlin.asJava.elements.KtLightIdentifier
 import org.jetbrains.kotlin.asJava.elements.KtLightMethod
 import org.jetbrains.kotlin.descriptors.ClassKind
-import org.jetbrains.kotlin.descriptors.Visibilities
 import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.resolve.toSymbol
@@ -32,8 +30,16 @@ import org.jetbrains.kotlin.fir.symbols.StandardClassIds
 import org.jetbrains.kotlin.fir.types.ConeClassLikeType
 import org.jetbrains.kotlin.fir.types.ConeKotlinType
 import org.jetbrains.kotlin.fir.types.classId
-import org.jetbrains.kotlin.idea.fir.low.level.api.api.LowLevelFirApiFacade
-import org.jetbrains.kotlin.idea.util.ifTrue
+import org.jetbrains.kotlin.idea.frontend.api.analyze
+import org.jetbrains.kotlin.idea.frontend.api.fir.analyzeWithSymbolAsContext
+import org.jetbrains.kotlin.idea.frontend.api.fir.symbols.KtFirClassOrObjectSymbol
+import org.jetbrains.kotlin.idea.frontend.api.fir.types.KtFirClassType
+import org.jetbrains.kotlin.idea.frontend.api.symbols.KtClassKind
+import org.jetbrains.kotlin.idea.frontend.api.symbols.KtClassOrObjectSymbol
+import org.jetbrains.kotlin.idea.frontend.api.symbols.KtFunctionSymbol
+import org.jetbrains.kotlin.idea.frontend.api.symbols.markers.KtSymbolKind
+import org.jetbrains.kotlin.idea.frontend.api.symbols.markers.KtSymbolVisibility
+import org.jetbrains.kotlin.idea.util.ifFalse
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.load.java.structure.LightClassOriginKind
 import org.jetbrains.kotlin.load.kotlin.TypeMappingMode
@@ -44,26 +50,33 @@ import org.jetbrains.kotlin.psi.stubs.KotlinClassOrObjectStub
 import javax.swing.Icon
 import kotlin.collections.ArrayList
 
-open class FirLightClassForSourceDeclaration(private val classOrObject: KtClassOrObject) :
-    FirLightClassBase(classOrObject.manager),
+open class FirLightClassForSourceDeclaration(
+    private val classOrObject: KtClassOrObjectSymbol,
+    manager: PsiManager
+) :
+    FirLightClassBase(manager),
     StubBasedPsiElement<KotlinClassOrObjectStub<out KtClassOrObject>> {
 
+    private val isTopLevel: Boolean = classOrObject.symbolKind == KtSymbolKind.TOP_LEVEL
+
     private val _modifierList: PsiModifierList? by lazyPub {
-        classOrObject.withFir<FirMemberDeclaration, PsiModifierList> {
-            val memberModifiers = this.computeSimpleModality() + computeVisibility(classOrObject.isTopLevel())
 
-            val staticNeeded = !classOrObject.isTopLevel() && this is FirRegularClass && !isInner
-            val modifiers = staticNeeded.ifTrue { memberModifiers + PsiModifier.STATIC } ?: memberModifiers
-
-            val annotations = computeAnnotations(this@FirLightClassForSourceDeclaration)
-
-            FirLightClassModifierList(this@FirLightClassForSourceDeclaration, modifiers, annotations)
+        val modifiers = mutableSetOf(classOrObject.computeVisibility(isTopLevel))
+        classOrObject.computeSimpleModality()?.run {
+            modifiers.add(this)
         }
+        if (!isTopLevel && !classOrObject.isInner) {
+            modifiers.add(PsiModifier.STATIC)
+        }
+
+        val annotations = classOrObject.computeAnnotations(this@FirLightClassForSourceDeclaration)
+
+        FirLightClassModifierList(this@FirLightClassForSourceDeclaration, modifiers, annotations)
     }
 
     override fun getModifierList(): PsiModifierList? = _modifierList
     override fun getOwnFields(): List<KtLightField> = _ownFields
-    override fun getOwnMethods(): List<PsiMethod> = _ownMethods.value
+    override fun getOwnMethods(): List<PsiMethod> = _ownMethods
     override fun isDeprecated(): Boolean = false //TODO()
     override fun getNameIdentifier(): KtLightIdentifier? = null //TODO()
     override fun getExtendsList(): PsiReferenceList? = _extendsList
@@ -77,12 +90,12 @@ open class FirLightClassForSourceDeclaration(private val classOrObject: KtClassO
         // workaround for ClassInnerStuffCache not supporting classes with null names, see KT-13927
         // inner classes with null names can't be searched for and can't be used from java anyway
         // we can't prohibit creating light classes with null names either since they can contain members
-        classOrObject.declarations.forEach { declaration ->
-            if (declaration is KtClassOrObject && declaration.name != null) {
-                result.add(FirLightClassForSourceDeclaration(declaration))
+
+        analyzeWithSymbolAsContext(classOrObject) {
+            classOrObject.getDeclaredMemberScope().getAllSymbols().filterIsInstance<KtClassOrObjectSymbol>().map {
+                result.add(FirLightClassForSourceDeclaration(it, manager))
             }
         }
-
 
         //TODO
         //if (classOrObject.hasInterfaceDefaultImpls) {
@@ -91,10 +104,10 @@ open class FirLightClassForSourceDeclaration(private val classOrObject: KtClassO
         return result
     }
 
-    override fun getTextOffset() = kotlinOrigin.textOffset
-    override fun getStartOffsetInParent() = kotlinOrigin.startOffsetInParent
-    override fun isWritable() = kotlinOrigin.isWritable
-    override val kotlinOrigin: KtClassOrObject = classOrObject
+    override fun getTextOffset(): Int = kotlinOrigin?.textOffset ?: 0
+    override fun getStartOffsetInParent(): Int = kotlinOrigin?.startOffsetInParent ?: 0
+    override fun isWritable() = kotlinOrigin?.isWritable ?: false
+    override val kotlinOrigin: KtClassOrObject? = classOrObject.psi as? KtClassOrObject
 
     private val _extendsList by lazyPub { createInheritanceList(forExtendsList = true) }
     private val _implementsList by lazyPub { createInheritanceList(forExtendsList = false) }
@@ -129,17 +142,19 @@ open class FirLightClassForSourceDeclaration(private val classOrObject: KtClassO
         if (isAnnotationType) return KotlinLightReferenceListBuilder(manager, language, role)
 
         val listBuilder = KotlinSuperTypeListBuilder(
-            kotlinOrigin = kotlinOrigin.getSuperTypeList(),
+            kotlinOrigin = kotlinOrigin?.getSuperTypeList(),
             manager = manager,
             language = language,
             role = role
         )
 
         //TODO Add support for kotlin.collections.
-        classOrObject.withFir<FirRegularClass, Unit> {
-            this.superConeTypes.forEach {
-                if (it.isTypeForInheritanceList(session, forExtendsList)) {
-                    val psiType = mapSupertype(session, it, kotlinCollectionAsIs = true)
+        require(classOrObject is KtFirClassOrObjectSymbol)
+        classOrObject.firRef.withFir {
+            classOrObject.superTypes.map { type ->
+                require(type is KtFirClassType)
+                if (type.coneType.isTypeForInheritanceList(it.session, forExtendsList)) {
+                    val psiType = mapSupertype(it.session, type.coneType, kotlinCollectionAsIs = true)
                     listBuilder.addReference(psiType)
                 }
             }
@@ -148,47 +163,41 @@ open class FirLightClassForSourceDeclaration(private val classOrObject: KtClassO
         return listBuilder
     }
 
-    private fun ownMethods(): List<KtLightMethod> =
-        classOrObject.withFir<FirRegularClass, List<KtLightMethod>> {
+    private val _ownMethods: List<KtLightMethod> by lazyPub {
 
-            val visibleDeclarations = declarations.filterNot {
-                it is FirMemberDeclaration && this.visibility == Visibilities.Private && isInterface
+        analyzeWithSymbolAsContext(classOrObject) {
+
+            //TODO filterNot { it.isHiddenByDeprecation(support) }
+            val callableSymbols = classOrObject.getDeclaredMemberScope().getCallableSymbols()
+            val visibleDeclarations = callableSymbols.filterNot {
+                isInterface && it is KtFunctionSymbol && it.visibility == KtSymbolVisibility.PRIVATE
             }
 
             mutableListOf<KtLightMethod>().also {
                 createMethods(visibleDeclarations, isTopLevel = false, it)
             }
         }
-
-    private val _ownMethods: CachedValue<List<KtLightMethod>> = CachedValuesManager.getManager(project).createCachedValue(
-        {
-            CachedValueProvider.Result.create(
-                ownMethods(),
-                classOrObject.getExternalDependencies()
-            )
-        }, false
-    )
+    }
 
     private val _ownFields: List<KtLightField> by lazyPub {
 
-        this.classOrObject.withFir<FirRegularClass, List<KtLightField>> {
+        val result = mutableListOf<KtLightField>()
 
-            val result = mutableListOf<KtLightField>()
-
-            companionObject?.run {
-                result.add(FirLightFieldForFirObjectNode(this, this@FirLightClassForSourceDeclaration, null))
-            }
-
-            val isNamedObject = classOrObject is KtObjectDeclaration && !classOrObject.isCompanion()
-            if (isNamedObject && !classOrObject.isLocal) {
-                result.add(FirLightFieldForFirObjectNode(this, this@FirLightClassForSourceDeclaration, null))
-            }
-
-            createFields(declarations, isTopLevel = false, result)
-
-            result
+        classOrObject.companionObject?.run {
+            result.add(FirLightFieldForFirObjectNode(this, this@FirLightClassForSourceDeclaration, null))
         }
 
+        val isNamedObject = classOrObject.classKind == KtClassKind.OBJECT
+        if (isNamedObject && classOrObject.symbolKind != KtSymbolKind.LOCAL) {
+            result.add(FirLightFieldForFirObjectNode(classOrObject, this@FirLightClassForSourceDeclaration, null))
+        }
+
+        analyzeWithSymbolAsContext(classOrObject) {
+            val callableSymbols = classOrObject.getDeclaredMemberScope().getCallableSymbols()
+            createFields(callableSymbols, isTopLevel = false, result)
+        }
+
+        result
 
 //        this.classOrObject.companionObjects.firstOrNull()?.let { companion ->
 //            result.add(
@@ -227,20 +236,22 @@ open class FirLightClassForSourceDeclaration(private val classOrObject: KtClassO
 //
     }
 
-    private val _containingFile: PsiFile by lazyPub {
-        val containingClass =
-            (!classOrObject.isTopLevel()).ifTrue { create(getOutermostClassOrObject(classOrObject)) } ?: this
-        FirFakeFileImpl(classOrObject, containingClass)
+    private val _containingFile: PsiFile? by lazyPub {
+
+        val kotlinOrigin = kotlinOrigin ?: return@lazyPub null
+
+        val containingClass = isTopLevel.ifFalse { create(getOutermostClassOrObject(kotlinOrigin)) } ?: this
+
+        FirFakeFileImpl(kotlinOrigin, containingClass)
     }
 
     override fun getContainingFile(): PsiFile? = _containingFile
 
-    override fun getNavigationElement(): PsiElement = classOrObject
+    override fun getNavigationElement(): PsiElement = kotlinOrigin ?: this
 
-    override fun isEquivalentTo(another: PsiElement?): Boolean {
-        return kotlinOrigin.isEquivalentTo(another) ||
+    override fun isEquivalentTo(another: PsiElement?): Boolean =
+        (kotlinOrigin?.isEquivalentTo(another) ?: false) ||
                 another is FirLightClassForSourceDeclaration && Comparing.equal(another.qualifiedName, qualifiedName)
-    }
 
     override fun getElementIcon(flags: Int): Icon? =
         throw UnsupportedOperationException("This should be done by JetIconProvider")
@@ -258,15 +269,7 @@ open class FirLightClassForSourceDeclaration(private val classOrObject: KtClassO
 
     override fun hashCode(): Int = classOrObject.hashCode()
 
-    override fun getName(): String = classOrObject.nameAsName?.asString() ?: ""
-
-    protected inline fun <reified T : FirDeclaration, K> KtClassOrObject.withFir(body: T.() -> K): K {
-        val resolveState = LowLevelFirApiFacade.getResolveStateFor(this)
-        return LowLevelFirApiFacade.withFirDeclaration(this, resolveState, FirResolvePhase.IMPLICIT_TYPES_BODY_RESOLVE) {
-            require(it is T)
-            it.body()
-        }
-    }
+    override fun getName(): String = classOrObject.name.asString()
 
     override fun hasModifierProperty(@NonNls name: String): Boolean = modifierList?.hasModifierProperty(name) ?: false
 
@@ -282,7 +285,7 @@ open class FirLightClassForSourceDeclaration(private val classOrObject: KtClassO
     override fun hasTypeParameters(): Boolean =
         classOrObject is KtClass && classOrObject.typeParameters.isNotEmpty()
 
-    override fun isValid(): Boolean = classOrObject.isValid
+    override fun isValid(): Boolean = kotlinOrigin?.isValid ?: true
 
     override fun isInheritor(baseClass: PsiClass, checkDeep: Boolean): Boolean =
         InheritanceImplUtil.isInheritor(this, baseClass, checkDeep)
@@ -292,16 +295,16 @@ open class FirLightClassForSourceDeclaration(private val classOrObject: KtClassO
         throw IncorrectOperationException()
 
     override fun toString() =
-        "${this::class.java.simpleName}:${classOrObject.getDebugText()}"
+        "${this::class.java.simpleName}:${kotlinOrigin?.getDebugText()}"
 
-    override fun getUseScope(): SearchScope = kotlinOrigin.useScope
-    override fun getElementType(): IStubElementType<out StubElement<*>, *>? = classOrObject.elementType
-    override fun getStub(): KotlinClassOrObjectStub<out KtClassOrObject>? = classOrObject.stub
+    override fun getUseScope(): SearchScope = kotlinOrigin?.useScope ?: TODO()
+    override fun getElementType(): IStubElementType<out StubElement<*>, *>? = kotlinOrigin?.elementType
+    override fun getStub(): KotlinClassOrObjectStub<out KtClassOrObject>? = kotlinOrigin?.stub
 
     override val originKind: LightClassOriginKind
         get() = LightClassOriginKind.SOURCE
 
-    override fun getQualifiedName() = classOrObject.fqName?.asString()
+    override fun getQualifiedName() = kotlinOrigin?.fqName?.asString()
 
     override fun getInterfaces(): Array<PsiClass> = PsiClassImplUtil.getInterfaces(this)
     override fun getSuperClass(): PsiClass? = PsiClassImplUtil.getSuperClass(this)
@@ -316,11 +319,11 @@ open class FirLightClassForSourceDeclaration(private val classOrObject: KtClassO
 
     override fun getContainingClass(): PsiClass? {
 
-        val containingBody = classOrObject.parent as? KtClassBody
+        val containingBody = kotlinOrigin?.parent as? KtClassBody
         val containingClass = containingBody?.parent as? KtClassOrObject
         containingClass?.let { return create(it) }
 
-        val containingBlock = classOrObject.parent as? KtBlockExpression
+        val containingBlock = kotlinOrigin?.parent as? KtBlockExpression
 //        val containingScript = containingBlock?.parent as? KtScript
 //        containingScript?.let { return KtLightClassForScript.create(it) }
 
@@ -335,7 +338,7 @@ open class FirLightClassForSourceDeclaration(private val classOrObject: KtClassO
         baseClass?.let { InheritanceImplUtil.isInheritorDeep(this, it, classToByPass) } ?: false
 
     override fun copy(): FirLightClassForSourceDeclaration =
-        FirLightClassForSourceDeclaration(classOrObject.copy() as KtClassOrObject)
+        FirLightClassForSourceDeclaration(classOrObject, manager)
 
     companion object {
         fun create(classOrObject: KtClassOrObject): FirLightClassForSourceDeclaration? =
@@ -362,7 +365,10 @@ open class FirLightClassForSourceDeclaration(private val classOrObject: KtClassO
                 classOrObject.isObjectLiteral() -> return null //TODO
                 classOrObject.safeIsLocal() -> return null //TODO
                 classOrObject.hasModifier(KtTokens.INLINE_KEYWORD) -> return null //TODO
-                else -> FirLightClassForSourceDeclaration(classOrObject)
+                else -> FirLightClassForSourceDeclaration(
+                    analyze(classOrObject) { classOrObject.getClassOrObjectSymbol() },
+                    manager = classOrObject.manager
+                )
             }
         }
     }

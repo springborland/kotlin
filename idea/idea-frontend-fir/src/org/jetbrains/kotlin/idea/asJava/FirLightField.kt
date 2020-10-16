@@ -22,6 +22,13 @@ import org.jetbrains.kotlin.fir.psi
 import org.jetbrains.kotlin.fir.types.impl.ConeClassLikeTypeImpl
 import org.jetbrains.kotlin.fir.types.impl.ConeTypeParameterTypeImpl
 import org.jetbrains.kotlin.idea.KotlinLanguage
+import org.jetbrains.kotlin.idea.frontend.api.fir.analyzeWithSymbolAsContext
+import org.jetbrains.kotlin.idea.frontend.api.fir.symbols.KtFirClassOrObjectSymbol
+import org.jetbrains.kotlin.idea.frontend.api.fir.symbols.KtFirPropertySymbol
+import org.jetbrains.kotlin.idea.frontend.api.fir.utils.firRef
+import org.jetbrains.kotlin.idea.frontend.api.symbols.KtClassKind
+import org.jetbrains.kotlin.idea.frontend.api.symbols.KtClassOrObjectSymbol
+import org.jetbrains.kotlin.idea.frontend.api.symbols.KtPropertySymbol
 import org.jetbrains.kotlin.load.kotlin.TypeMappingMode
 import org.jetbrains.kotlin.psi.*
 import javax.swing.Icon
@@ -96,28 +103,24 @@ internal abstract class FirLightField protected constructor(
 }
 
 internal class FirLightFieldForFirPropertyNode(
-    firProperty: FirProperty,
+    firProperty: KtPropertySymbol,
     containingClass: FirLightClassBase,
     lightMemberOrigin: LightMemberOrigin?,
     isTopLevel: Boolean
 ) : FirLightField(containingClass, lightMemberOrigin) {
 
-    init {
-        require(firProperty.hasBackingField)
-    }
-
     override val kotlinOrigin: KtDeclaration? = firProperty.psi as? KtDeclaration
 
-    private val lazyInitializers = mutableListOf<Lazy<*>>()
-    private inline fun <T> getAndAddLazy(crossinline initializer: () -> T): Lazy<T> =
-        lazyPub { initializer() }.also { lazyInitializers.add(it) }
+    private val _returnedType: PsiType by lazyPub {
 
-    private val _returnedType: PsiType by getAndAddLazy {
-        firProperty.returnTypeRef.asPsiType(
-            firProperty.session,
-            TypeMappingMode.DEFAULT,
-            this@FirLightFieldForFirPropertyNode
-        )
+        require(firProperty is KtFirPropertySymbol)
+        firProperty.firRef.withFir(FirResolvePhase.IMPLICIT_TYPES_BODY_RESOLVE) {
+            it.returnTypeRef.asPsiType(
+                it.session,
+                TypeMappingMode.DEFAULT,
+                this@FirLightFieldForFirPropertyNode
+            )
+        }
     }
 
     override fun getType(): PsiType = _returnedType
@@ -139,25 +142,17 @@ internal class FirLightFieldForFirPropertyNode(
 
 
     override fun getInitializer(): PsiExpression? = null //TODO
-
-    init {
-        //We should force computations on all lazy delegates to release descriptor on the end of ctor call
-        with(lazyInitializers) {
-            forEach { it.value }
-            clear()
-        }
-    }
 }
 
 internal class FirLightFieldForFirObjectNode(
-    firObjectNode: FirRegularClass,
+    firObjectNode: KtClassOrObjectSymbol,
     containingClass: KtLightClass,
     lightMemberOrigin: LightMemberOrigin?,
 ) : FirLightField(containingClass, lightMemberOrigin) {
 
     override val kotlinOrigin: KtDeclaration? = firObjectNode.psi as? KtDeclaration
 
-    private val _name = if (firObjectNode.isCompanion) firObjectNode.name.asString() else "INSTANCE"
+    private val _name = if (firObjectNode.classKind == KtClassKind.COMPANION_OBJECT) firObjectNode.name.asString() else "INSTANCE"
     override fun getName(): String = _name
 
     private val _modifierList: PsiModifierList by lazyPub {
@@ -169,11 +164,14 @@ internal class FirLightFieldForFirObjectNode(
     override fun getModifierList(): PsiModifierList? = _modifierList
 
     private val _type: PsiType = firObjectNode.run {
-        ConeClassLikeTypeImpl(
-            symbol.toLookupTag(),
-            typeParameters.map { ConeTypeParameterTypeImpl(it.symbol.toLookupTag(), isNullable = false) }.toTypedArray(),
-            isNullable = false
-        ).asPsiType(session, TypeMappingMode.DEFAULT, this@FirLightFieldForFirObjectNode)
+        require(firObjectNode is KtFirClassOrObjectSymbol)
+        firObjectNode.firRef.withFir(FirResolvePhase.TYPES) { firClass ->
+            ConeClassLikeTypeImpl(
+                firClass.symbol.toLookupTag(),
+                firClass.typeParameters.map { ConeTypeParameterTypeImpl(it.symbol.toLookupTag(), isNullable = false) }.toTypedArray(),
+                isNullable = false
+            ).asPsiType(firClass.session, TypeMappingMode.DEFAULT, this@FirLightFieldForFirObjectNode)
+        }
     }
 
     override fun getType(): PsiType = _type
