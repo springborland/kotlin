@@ -29,7 +29,6 @@ import org.jetbrains.kotlin.types.Variance
 import org.jetbrains.kotlin.types.model.*
 import org.jetbrains.kotlin.ir.types.isPrimitiveType as irTypePredicates_isPrimitiveType
 
-@OptIn(ObsoleteDescriptorBasedAPI::class)
 interface IrTypeSystemContext : TypeSystemContext, TypeSystemCommonSuperTypesContext, TypeSystemCommonBackendContext {
 
     val irBuiltIns: IrBuiltIns
@@ -309,7 +308,7 @@ interface IrTypeSystemContext : TypeSystemContext, TypeSystemCommonSuperTypesCon
 
     override fun KotlinTypeMarker.getAnnotationFirstArgumentValue(fqName: FqName): Any? =
         (this as? IrType)?.annotations?.firstOrNull { annotation ->
-            annotation.symbol.owner.parentAsClass.descriptor.fqNameSafe == fqName
+            annotation.symbol.owner.parentAsClass.fqNameWhenAvailable == fqName
         }?.run {
             if (valueArgumentsCount > 0) (getValueArgument(0) as? IrConst<*>)?.value else null
         }
