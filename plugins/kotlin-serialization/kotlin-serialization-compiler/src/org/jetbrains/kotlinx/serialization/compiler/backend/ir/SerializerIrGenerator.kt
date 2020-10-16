@@ -325,7 +325,7 @@ open class SerializerIrGenerator(val irClass: IrClass, final override val compil
     }
 
     // returns null: Any? for boxed types and 0: <number type> for primitives
-    private fun IrBuilderWithScope.defaultValueAndType(prop: SerializableProperty): Pair<IrExpression, KotlinType> {
+    private fun IrBuilderWithScope.defaultValueAndType(prop: SerializableProperty): Pair<IrExpression, IrType> {
         val kType = prop.descriptor.returnType!!
         val T = kType.toIrType()
         val defaultPrimitive: IrExpression? = when {
@@ -340,9 +340,9 @@ open class SerializerIrGenerator(val irClass: IrClass, final override val compil
             else -> null
         }
         return if (defaultPrimitive == null)
-            irNull(compilerContext.irBuiltIns.anyNType) to (compilerContext.builtIns.nullableAnyType)
+            irNull(compilerContext.irBuiltIns.anyNType) to (compilerContext.irBuiltIns.anyNType)
         else
-            defaultPrimitive to kType
+            defaultPrimitive to T
     }
 
     override fun generateLoad(function: FunctionDescriptor) = irClass.contributeFunction(function) { loadFunc ->
@@ -376,7 +376,7 @@ open class SerializerIrGenerator(val irClass: IrClass, final override val compil
             irTemporaryVar(
                 expr,
                 "local$i",
-                typeHint = type
+                type
             )
         }
 
