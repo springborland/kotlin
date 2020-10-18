@@ -35,6 +35,17 @@ class Stats(
 
     init {
         PerformanceCounter.setTimeCounterEnabled(true)
+        if (name == "completion-basic") {
+            printCallStackTrace()
+        }
+    }
+
+    private fun printCallStackTrace() {
+        try {
+            throw Exception(name)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     private fun calcAndProcessMetrics(id: String, statInfosArray: Array<StatInfos>, rawMetricChildren: MutableList<Metric>) {
@@ -401,6 +412,9 @@ class Stats(
             return this.children.any { it.ifHasError() }
         }
         logMessage { "write $name" }
+        if (name == "completion-basic") {
+            printCallStackTrace()
+        }
         if (metric.ifHasError()) {
             logMessage { "writeJson: $metric" }
         }
