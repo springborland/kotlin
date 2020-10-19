@@ -10,6 +10,7 @@ import org.jetbrains.kotlin.fir.expressions.FirConstKind
 import org.jetbrains.kotlin.fir.symbols.StandardClassIds
 import org.jetbrains.kotlin.fir.types.impl.FirImplicitBuiltinTypeRef
 import org.jetbrains.kotlin.name.ClassId
+import org.jetbrains.kotlin.name.FqName
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.contract
 
@@ -95,12 +96,22 @@ fun List<FirAnnotationCall>.computeTypeAttributes(): ConeAttributes {
         when (type.lookupTag.classId) {
             CompilerConeAttributes.Exact.ANNOTATION_CLASS_ID -> attributes += CompilerConeAttributes.Exact
             CompilerConeAttributes.NoInfer.ANNOTATION_CLASS_ID -> attributes += CompilerConeAttributes.NoInfer
+            CompilerConeAttributes.EnhancedNullability.ANNOTATION_CLASS_ID -> attributes += CompilerConeAttributes.EnhancedNullability
             CompilerConeAttributes.ExtensionFunctionType.ANNOTATION_CLASS_ID -> attributes += CompilerConeAttributes.ExtensionFunctionType
             CompilerConeAttributes.UnsafeVariance.ANNOTATION_CLASS_ID -> attributes += CompilerConeAttributes.UnsafeVariance
+            in NOT_NULL_ANNOTATION_IDS -> attributes += CompilerConeAttributes.EnhancedNullability
         }
     }
     return ConeAttributes.create(attributes)
 }
+
+// Not to load [org/jetbrains/kotlin/load/java/JvmAnnotationNames.JETBRAINS_NOT_NULL_ANNOTATION] at :compiler.common.jvm
+private val JETBRAINS_NOT_NULL_ANNOTATION = FqName("org.jetbrains.annotations.NotNull");
+// More NotNull annotations at [JvmAnnotationNames] kt files
+private val NOT_NULL_ANNOTATIONS = listOf(
+    JETBRAINS_NOT_NULL_ANNOTATION
+)
+val NOT_NULL_ANNOTATION_IDS = NOT_NULL_ANNOTATIONS.map { ClassId.topLevel(it) }
 
 fun FirTypeProjection.toConeTypeProjection(): ConeTypeProjection =
     when (this) {

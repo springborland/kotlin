@@ -542,7 +542,22 @@ class Fir2IrVisitor(
                     expression.accept(this, null) as IrExpression
                 }
             }
+        }.insertImplicitNotNullCastIfNeeded(expression)
+    }
+
+    private fun IrExpression.insertImplicitNotNullCastIfNeeded(expression: FirExpression): IrExpression {
+        // TODO: Other conditions to check?
+        if (expression.typeRef.coneTypeSafe<ConeKotlinType>()?.hasEnhancedNullability != true) {
+            return this
         }
+        return IrTypeOperatorCallImpl(
+            this.startOffset,
+            this.endOffset,
+            this.type,
+            IrTypeOperator.IMPLICIT_NOTNULL,
+            this.type,
+            this
+        )
     }
 
     private fun convertToIrReceiverExpression(
